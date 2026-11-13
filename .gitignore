@@ -12,3 +12,6 @@ data/
 *.db
 
 node_modules/
+
+# Prototype construit (node prototype/build.mjs)
+prototype/prototype-series.html
