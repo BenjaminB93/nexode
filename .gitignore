@@ -1,0 +1,14 @@
+# Données personnelles (exports RGPD, imports) — ne jamais commiter
+import-tv-show/
+imports/
+
+# Secrets
+.env
+
+# Base locale
+data/
+*.sqlite
+*.sqlite-*
+*.db
+
+node_modules/
