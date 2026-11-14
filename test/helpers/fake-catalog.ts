@@ -2,7 +2,8 @@ import { type Db, openDb } from '../../src/db/index.ts';
 import { migrate } from '../../src/db/migrate.ts';
 import type { Catalog, SearchResult } from '../../src/ports.ts';
 import type { Ctx, User } from '../../src/usecases/context.ts';
-import { ensureUser } from '../../src/infra/repos.ts';
+import { type UserRow, getUser } from '../../src/infra/repos.ts';
+import { addUser } from './auth.ts';
 
 // Série de test : dates de sortie par saison et par épisode (null = date inconnue).
 export type ShowFixture = {
@@ -88,12 +89,13 @@ export class FakeCatalog implements Catalog {
   }
 }
 
-// Contexte de use case : utilisateur 'dev' (Europe/Paris, seuil 30 j par défaut), instant now réglable.
+// Contexte de use case : utilisateur 'dev' (Membre, Europe/Paris, seuil 30 j par défaut), instant now réglable.
 export function makeCtx(db: Db, catalog: Catalog, now: string, settings: Partial<Pick<User, 'timezone' | 'shelveAfterDays' | 'country'>> = {}): Ctx {
-  const u = ensureUser(db, 'dev', now);
-  if (settings.timezone) db.prepare('UPDATE users SET timezone = ? WHERE id = ?').run(settings.timezone, u.id);
-  if (settings.shelveAfterDays) db.prepare('UPDATE users SET shelve_after_days = ? WHERE id = ?').run(settings.shelveAfterDays, u.id);
-  if (settings.country) db.prepare('UPDATE users SET country = ? WHERE id = ?').run(settings.country, u.id);
-  const row = ensureUser(db, 'dev', now);
-  return { db, catalog, now: new Date(now), user: { id: row.id, country: row.country, timezone: row.timezone, shelveAfterDays: row.shelveAfterDays } };
+  const row = db.prepare("SELECT id FROM users WHERE username = 'dev'").get() as { id: number } | undefined;
+  const id = row?.id ?? addUser(db, 'dev', { now });
+  if (settings.timezone) db.prepare('UPDATE users SET timezone = ? WHERE id = ?').run(settings.timezone, id);
+  if (settings.shelveAfterDays) db.prepare('UPDATE users SET shelve_after_days = ? WHERE id = ?').run(settings.shelveAfterDays, id);
+  if (settings.country) db.prepare('UPDATE users SET country = ? WHERE id = ?').run(settings.country, id);
+  const u = getUser(db, id) as UserRow;
+  return { db, catalog, now: new Date(now), user: { id: u.id, role: u.role, country: u.country, timezone: u.timezone, shelveAfterDays: u.shelveAfterDays } };
 }

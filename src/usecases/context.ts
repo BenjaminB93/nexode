@@ -1,21 +1,26 @@
 import type { Db } from '../db/index.ts';
 import type { Catalog } from '../ports.ts';
+import type { Role } from '../domain/accounts.ts';
 import { todayIn } from '../domain/dates.ts';
 
-export type User = { id: number; country: string; timezone: string; shelveAfterDays: number };
+export type User = { id: number; role: Role; country: string; timezone: string; shelveAfterDays: number };
 
-// Contexte d'une requête : l'instant now est figé pour toute l'action.
-export type Ctx = { db: Db; catalog: Catalog; user: User; now: Date };
+// Contexte sans utilisateur (connexion, inscription, réinitialisation) : l'instant now est figé pour toute l'action.
+export type Base = { db: Db; now: Date };
+// Contexte d'une requête authentifiée.
+export type Ctx = Base & { catalog: Catalog; user: User };
 
-export const nowIso = (ctx: Ctx) => ctx.now.toISOString();
+export const nowIso = (ctx: Base) => ctx.now.toISOString();
 export const today = (ctx: Ctx) => todayIn(ctx.user.timezone, ctx.now);
 
-// Erreurs métier ; la couche HTTP les traduit en codes de statut.
+// Erreurs métier ; la couche HTTP les traduit en codes de statut. details est ajouté au corps de la réponse.
 export class AppError extends Error {
   readonly code: string;
-  constructor(code: string, message?: string) {
+  readonly details: Record<string, string | number>;
+  constructor(code: string, message?: string, details: Record<string, string | number> = {}) {
     super(message ?? code);
     this.code = code;
+    this.details = details;
   }
 }
 export class NotFoundError extends AppError {
@@ -27,10 +32,13 @@ export class NotAiredError extends AppError {
 export class InvalidInputError extends AppError {
   readonly field: string;
   constructor(field: string) {
-    super('invalid_input', `entrée invalide : ${field}`);
+    super('invalid_input', `entrée invalide : ${field}`, { field });
     this.field = field;
   }
 }
 export class UpstreamError extends AppError {
   constructor(message: string) { super('catalog_unavailable', message); }
+}
+export class ForbiddenError extends AppError {
+  constructor() { super('forbidden', 'rôle insuffisant'); }
 }

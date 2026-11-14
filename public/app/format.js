@@ -106,3 +106,28 @@ export const HOURS = Array.from({ length: 24 }, (_, h) => ({ v: String(h), l: h 
 
 /** @param {string} c */
 export function countryName(c) { return (COUNTRIES.find((x) => x.v === c) || { l: c }).l; }
+
+/**
+ * Jour local ('YYYY-MM-DD') d'un horodatage du serveur : ISO, ou format SQLite « AAAA-MM-JJ HH:MM:SS » (UTC).
+ * @param {string} stamp @param {string} timezone
+ */
+export function dayOf(stamp, timezone) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(stamp)) return stamp;
+  let iso = stamp.includes('T') ? stamp : stamp.replace(' ', 'T');
+  if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(iso)) iso += 'Z';
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? stamp.slice(0, 10) : localDay(new Date(t).toISOString(), timezone);
+}
+
+// Rôle d'un compte : [libellé, fond, texte].
+/** @type {Record<string, [string, string, string]>} */
+export const ROLES = {
+  admin: ['Admin', 'var(--accent-bg)', 'var(--accent)'],
+  parrain: ['Parrain', 'var(--ok-bg)', 'var(--ok-fg)'],
+  membre: ['Membre', 'var(--chip)', 'var(--soft)'],
+};
+/** Rôles qu'un admin peut attribuer. */
+export const ROLE_SEGS = [
+  { v: 'membre', l: 'Membre', c: ROLES.membre.slice(1) },
+  { v: 'parrain', l: 'Parrain', c: ROLES.parrain.slice(1) },
+];

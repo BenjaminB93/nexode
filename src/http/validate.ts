@@ -72,3 +72,15 @@ export async function jsonBody(c: Context, allowedKeys: readonly string[]): Prom
   for (const key of Object.keys(body)) if (!allowedKeys.includes(key)) throw new InvalidInputError(key);
   return body as Record<string, unknown>;
 }
+
+// Chaîne dans un corps JSON, longueur bornée (les règles métier sont vérifiées plus loin).
+export function str(raw: unknown, field: string, max = 1000): string {
+  if (typeof raw !== 'string' || raw.length > max) throw new InvalidInputError(field);
+  return raw;
+}
+
+// Écriture sans paramètre : corps absent, ou objet JSON vide.
+export async function noBody(c: Context): Promise<void> {
+  if (c.req.header('content-type') === undefined && (await c.req.text()) === '') return;
+  await jsonBody(c, []);
+}

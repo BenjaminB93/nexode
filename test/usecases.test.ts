@@ -358,11 +358,11 @@ test('À regarder : upNext = épisodes sortis non vus après next, même forme q
 test('réglages : valeurs par défaut, écriture partielle, seuil appliqué aux listes', async () => {
   const { db, catalog, ctx } = setup();
   assert.deepEqual(getSettings(ctx),
-    { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
+    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
   assert.deepEqual(updateSettings(ctx, { notifOn: false, notifHour: 0 }),
-    { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
   assert.deepEqual(updateSettings(ctx, { country: 'BE', shelveAfterDays: 90 }),
-    { username: 'dev', country: 'BE', shelveAfterDays: 90, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+    { username: 'dev', role: 'membre', country: 'BE', shelveAfterDays: 90, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
   assert.equal(updateSettings(ctx, {}).country, 'BE');
 
   // LONGUE ajoutée il y a ~45 jours sans épisode vu : de côté à 30 j, en cours à 90 j.

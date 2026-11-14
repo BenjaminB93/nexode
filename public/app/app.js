@@ -1,9 +1,11 @@
 // @ts-check
-// Composant racine : état de l'appli, chargements, écritures optimistes, navigation (onglets, explorateur, historique
-// du navigateur), gestes (swipe, ressort « À venir ») et défilement de la timeline. Le rendu des écrans est dans views/.
+// Composant racine : session (connexion, pages ouvertes par un lien), état de l'appli, chargements, écritures optimistes,
+// navigation (onglets, explorateur, historique du navigateur), gestes (swipe, ressort « À venir ») et défilement de la
+// timeline. Le rendu des écrans est dans views/.
 import { html, Component } from '../vendor/htm-preact-3.1.1.js';
-import { api, isAbort } from './api.js';
-import { THEMES, compareEp, localDay, plural } from './format.js';
+import { api, isAbort, onUnauthorized } from './api.js';
+import { THEMES, compareEp, dayOf, fShort, inDays, localDay, plural } from './format.js';
+import { authErrorField, authErrorText, canInvite, cleanName, parseAuthRoute } from './auth.js';
 import * as S from './store.js';
 import { I } from './icons.js';
 import { confirmSheet, pickerSheet } from './components.js';
@@ -14,6 +16,8 @@ import { viewProfil } from './views/profil.js';
 import { viewShow } from './views/show.js';
 import { viewSeason } from './views/season.js';
 import { viewEpisode } from './views/episode.js';
+import { viewAuth } from './views/auth.js';
+import { accountSheet, deleteSelfSheet, exportSheetView, linkSheetView, viewAdmin, viewInvites } from './views/account.js';
 
 /** Glissement à dépasser pour valider un swipe (px). */
 export const THRESHOLD = 110;
@@ -32,7 +36,8 @@ function loadTheme() {
   return 'system';
 }
 
-/** @typedef {{ type: 'show' | 'season' | 'episode', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
+/** Vue empilée : explorateur (show = id de série) ou écran de compte ouvert depuis Profil (show = 0).
+ * @typedef {{ type: 'show' | 'season' | 'episode' | 'invites' | 'admin', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
 
 /** @param {View} v */
 const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v.ep ?? '');
@@ -51,14 +56,46 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  */
 
 /**
+ * Page hors appli. info : réponse de la lecture du lien (invitation, réinitialisation).
+ * @typedef {{ screen: 'login' | 'signup' | 'reset' | 'invalid', code?: string, token?: string, info?: any, infoFailed?: boolean }} Auth
+ * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null }} Form
+ * Feuille « Supprimer mon compte » ; bad : champ refusé par le serveur (seul le mot de passe peut l'être).
+ * @typedef {Omit<Form, 'name'>} DelSelf
+ */
+
+/**
  * @typedef {{
  *   tab: string, stack: View[], drag: any, toast: { text: string, undo: (() => void) | null } | null,
  *   picker: any, confirm: any, upcomingOpen: boolean, theme: string,
  *   me: any, today: string | null, tl: any, hist: any, shelf: any, mine: any,
  *   search: { q: string, results: any[] | null, loading: boolean, error: boolean },
  *   shows: Record<number, any>, seasons: Record<string, any>, errs: Record<string, boolean>,
+ *   auth: Auth | null, form: Form,
+ *   invites: any[] | null, users: any[] | null, creatingInvite: boolean, resetBusy: boolean,
+ *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
+ *   account: number | null, exportSheet: { data: any } | null,
+ *   delSelf: DelSelf | null,
  * }} State
  */
+
+/** @returns {Form} */
+const emptyForm = () => ({ name: '', pw: '', show: false, busy: false, error: null, bad: null });
+
+/** État d'une session neuve (démarrage, connexion, déconnexion) : rien du compte précédent ne reste. @param {string} theme @returns {State} */
+function initialState(theme) {
+  return {
+    tab: 'encours', stack: [], drag: null, toast: null, picker: null, confirm: null, upcomingOpen: false,
+    theme,
+    me: null, today: null,
+    tl: null, hist: null, shelf: null, mine: null,
+    search: { q: '', results: null, loading: false, error: false },
+    shows: {}, seasons: {},
+    errs: {},
+    auth: null, form: emptyForm(),
+    invites: null, users: null, creatingInvite: false, resetBusy: false,
+    linkSheet: null, account: null, exportSheet: null, delSelf: null,
+  };
+}
 
 /** @extends {Component<any, State>} */
 export class App extends Component {
@@ -85,15 +122,16 @@ export class App extends Component {
     this.lastDepth = 0;
     this.viewAnim = '';
     /** @type {State} */
-    this.state = {
-      tab: 'encours', stack: /** @type {View[]} */ ([]), drag: null, toast: null, picker: null, confirm: null, upcomingOpen: false,
-      theme: loadTheme(),
-      me: null, today: null,
-      tl: null, hist: null, shelf: null, mine: null,
-      search: { q: '', results: null, loading: false, error: false },
-      shows: {}, seasons: {},
-      errs: {},
-    };
+    this.state = initialState(loadTheme());
+    // Session courante : une réponse arrivée après une connexion ou une déconnexion est jetée (voir read, pump).
+    this.epoch = 0;
+    /** @type {number | null} session close par signedOut (les 401 suivants de la même session sont ignorés) */
+    this.signedOutEpoch = null;
+    this.authSeq = 0;
+    this.loggingOut = false;
+    this.revoking = false;
+    /** @type {Record<number, number>} dernier choix de rôle envoyé, par compte */
+    this.roleSeq = {};
     /** @type {Op[]} */
     this.queue = [];
     this.running = false;
@@ -167,12 +205,20 @@ export class App extends Component {
       this.useHistory = true;
     } catch { this.useHistory = false; }
     window.addEventListener('popstate', this.onPop);
+    // Session expirée ou supprimée en cours d'utilisation : retour à la connexion.
+    onUnauthorized(() => this.signedOut());
+    const route = parseAuthRoute(location.pathname);
+    if (route) { this.openAuthRoute(route); return; }
+    // Sans session, /api/me et la timeline répondent 401 : la connexion s'affiche.
     this.pendingScroll = 'anchor';
     this.loadMe();
     this.loadTab('encours');
   }
 
-  componentWillUnmount() { window.removeEventListener('popstate', this.onPop); }
+  componentWillUnmount() {
+    window.removeEventListener('popstate', this.onPop);
+    onUnauthorized(null);
+  }
 
   componentDidUpdate() {
     // Timeline démontée (changement d'onglet) : sa référence ne doit plus servir au placement.
@@ -218,12 +264,21 @@ export class App extends Component {
     if (t === 'encours') this.loadTimeline();
     else if (t === 'decote') this.loadShelf();
     else if (t === 'series') this.loadMine();
-    else if (t === 'profil') { this.loadMe(); this.loadMine(); }
+    else if (t === 'profil') {
+      this.loadMine();
+      // Le rôle décide des lignes Parrainages / Comptes et de leurs compteurs.
+      this.loadMe().then((ok) => {
+        const me = this.state.me;
+        if (!ok || !me || this.state.tab !== 'profil') return;
+        if (canInvite(me.role)) this.loadInvites();
+        if (me.role === 'admin') this.loadUsers();
+      });
+    }
   }
 
   loadMe() {
     this.setErr('me', false);
-    this.read(() => api.me(), (me) => this.setState({ me }), () => { if (!this.state.me) this.setErr('me', true); });
+    return this.read(() => api.me(), (me) => this.setState({ me }), () => { if (!this.state.me) this.setErr('me', true); });
   }
 
   loadTimeline() {
@@ -270,19 +325,21 @@ export class App extends Component {
    * antérieure à l'affichage optimiste ; elle est jetée et la lecture relancée une fois la file d'écritures vide.
    * Résout true une fois les données appliquées (relance comprise), false en cas d'échec.
    * @template T
-   * @param {() => Promise<T>} request @param {(data: T) => void} apply @param {() => void} onError
+   * @param {() => Promise<T>} request @param {(data: T) => void} apply @param {(e: any) => void} onError
    * @returns {Promise<boolean>}
    */
   read(request, apply, onError) {
     const seq0 = this.writeSeq;
     const busy0 = this.queue.length > 0;
+    const epoch = this.epoch;
     return request().then((data) => {
+      if (epoch !== this.epoch) return false;
       if (busy0 || this.writeSeq !== seq0 || this.queue.length) {
         return new Promise((resolve) => this.afterWrites(() => resolve(this.read(request, apply, onError))));
       }
       apply(data);
       return true;
-    }, () => { onError(); return false; });
+    }, (e) => { if (epoch === this.epoch) onError(e); return false; });
   }
 
   /** @param {() => void} fn */
@@ -301,7 +358,7 @@ export class App extends Component {
     const cur = this.inflight.get(k);
     if (cur) return cur;
     this.setErr(k, false);
-    const p = load().finally(() => this.inflight.delete(k));
+    const p = load().finally(() => { if (this.inflight.get(k) === p) this.inflight.delete(k); });
     this.inflight.set(k, p);
     return p;
   }
@@ -319,7 +376,9 @@ export class App extends Component {
     if (key === this.ensuredKey) return;
     this.ensuredKey = key;
     if (!top) return;
-    if (top.type === 'show') this.loadShow(top.show);
+    if (top.type === 'invites') this.loadInvites();
+    else if (top.type === 'admin') this.loadUsers();
+    else if (top.type === 'show') this.loadShow(top.show);
     else {
       this.loadSeason(top.show, /** @type {number} */ (top.season));
       if (top.type === 'episode') this.loadShow(top.show);
@@ -394,12 +453,18 @@ export class App extends Component {
   async pump() {
     if (this.running) return;
     this.running = true;
+    let epoch = this.epoch;
     while (this.queue.length) {
       const op = this.queue[0];
-      let res;
+      let res, ok = true;
       try {
         res = await op.request();
       } catch {
+        ok = false;
+      }
+      // Session changée pendant la requête : la file a été vidée, cette écriture ne concerne plus l'écran.
+      if (epoch !== this.epoch) { epoch = this.epoch; continue; }
+      if (!ok) {
         this.fail();
         continue;
       }
@@ -620,6 +685,317 @@ export class App extends Component {
     });
   }
 
+  // ---------- session ----------
+  /**
+   * Repart d'un état neuf (rien du compte précédent ne reste à l'écran ni en mémoire) ; auth = page hors appli à afficher.
+   * Les requêtes encore en vol sont ignorées à leur retour (epoch).
+   * @param {Auth | null} auth
+   */
+  resetSession(auth) {
+    this.epoch++;
+    this.queue = [];
+    this.pending = {};
+    this.waiting = [];
+    this.needResync.clear();
+    this.inflight.clear();
+    this.scrollMemo.clear();
+    this.pendingRestore = null;
+    this.ensuredKey = null;
+    this.anchorKeep = null;
+    this.pendingOpenShift = null;
+    this.touched = false;
+    this.histGen++;
+    this.searchSeq++;
+    this.searchTerm = '';
+    if (this.searchCtl) this.searchCtl.abort();
+    clearTimeout(this.searchTimer);
+    clearTimeout(this.toastTimer);
+    this.g = null;
+    this.loggingOut = false;
+    this.revoking = false;
+    // Vues de l'explorateur ouvertes : leurs entrées d'historique sont retirées (le popstate trouvera une pile vide).
+    if (this.useHistory && this.state.stack.length) history.go(-this.state.stack.length);
+    this.setState({ ...initialState(this.state.theme), auth });
+  }
+
+  /** Session terminée (déconnexion, compte supprimé, 401 en cours d'utilisation) : page de connexion. @param {string} [text] */
+  signedOut(text) {
+    // Plusieurs 401 arrivent ensemble (démarrage sans session) : une seule remise à zéro.
+    if (this.state.auth || this.signedOutEpoch === this.epoch) return;
+    this.resetSession({ screen: 'login' });
+    this.signedOutEpoch = this.epoch;
+    if (text) this.toast(text);
+  }
+
+  /** Page ouverte par un lien : inscription ou nouveau mot de passe ; le lien est vérifié tout de suite. @param {{ screen: 'signup', code: string } | { screen: 'reset', token: string }} route */
+  openAuthRoute(route) {
+    /** @type {Auth} */
+    const auth = route.screen === 'signup' ? { screen: 'signup', code: route.code } : { screen: 'reset', token: route.token };
+    this.setState({ auth, form: emptyForm() });
+    const req = route.screen === 'signup' ? api.invite(route.code) : api.resetInfo(route.token);
+    req.then((info) => this.setState((/** @type {State} */ s) => (s.auth === auth ? { auth: { ...auth, info } } : null)),
+      (e) => this.setState((/** @type {State} */ s) => {
+        if (!s.auth || (s.auth.code ?? s.auth.token) !== (auth.code ?? auth.token)) return null;
+        // Lien inconnu, utilisé, expiré ou révoqué : aucune distinction. Autre échec : le formulaire reste utilisable.
+        return { auth: e && e.status === 404 ? { ...s.auth, screen: 'invalid' } : { ...s.auth, infoFailed: true } };
+      }));
+  }
+
+  /** Connexion (depuis un lien invalide, ou après une suppression) : l'adresse redevient '/'. */
+  toLogin() {
+    try { history.replaceState({ nav: 0 }, '', '/'); } catch { /* adresse inchangée */ }
+    this.setState({ auth: { screen: 'login' }, form: emptyForm() });
+  }
+
+  /** @param {Partial<Form>} patch */
+  setForm(patch) { this.setState((/** @type {State} */ s) => ({ form: { ...s.form, ...patch } })); }
+
+  /** Envoi du formulaire de la page hors appli affichée. */
+  submitAuth() {
+    const a = this.state.auth, f = this.state.form;
+    if (!a || f.busy) return;
+    if (a.screen === 'invalid') { this.toLogin(); return; }
+    const name = cleanName(f.name);
+    this.setForm({ busy: true, error: null, bad: null });
+    // Identifie cet envoi : l'objet auth change quand la lecture du lien arrive pendant la requête.
+    const seq = ++this.authSeq;
+    const req = a.screen === 'signup' ? api.signup(/** @type {string} */ (a.code), name, f.pw)
+      : a.screen === 'reset' ? api.reset(/** @type {string} */ (a.token), f.pw)
+      : api.login(name, f.pw);
+    req.then((res) => {
+      if (seq !== this.authSeq || !this.state.auth) return;
+      this.enterApp(res.me, a.screen === 'signup' ? 'Compte « ' + res.me.username + ' » créé' : a.screen === 'reset' ? 'Mot de passe enregistré' : null);
+    }, (e) => {
+      if (seq !== this.authSeq || !this.state.auth) return;
+      if (e && (e.code === 'invite_invalid' || e.code === 'reset_invalid')) this.setState((/** @type {State} */ s) => ({ auth: { ...(s.auth || a), screen: 'invalid' }, form: emptyForm() }));
+      else this.setForm({ busy: false, error: authErrorText(e), bad: authErrorField(e) });
+    });
+  }
+
+  /** Session ouverte : entrée dans l'appli, à l'adresse '/'. @param {any} me @param {string | null} text */
+  enterApp(me, text) {
+    try { history.replaceState({ nav: 0 }, '', '/'); } catch { /* adresse inchangée */ }
+    this.resetSession(null);
+    this.setState({ me });
+    this.pendingScroll = 'anchor';
+    this.loadTab('encours');
+    if (text) this.toast(text);
+  }
+
+  // Les écritures en attente partent d'abord (sinon un swipe juste avant serait perdu).
+  logout() {
+    if (this.loggingOut) return;
+    this.loggingOut = true;
+    this.afterWrites(() => {
+      api.logout().then(() => this.signedOut(), (e) => this.failToast(e, 'Déconnexion impossible'))
+        .finally(() => { this.loggingOut = false; });
+    });
+  }
+
+  /** Échec d'une action : toast, sauf session terminée (la connexion s'affiche déjà). @param {any} e @param {string} text */
+  failToast(e, text) {
+    if (this.state.auth || (e && e.status === 401) || this.lostRights(e)) return;
+    this.toast(text);
+  }
+
+  /**
+   * 403 forbidden : le rôle a changé pendant l'utilisation (Parrain repassé Membre). Feuilles de compte fermées, rôle
+   * relu, écrans qu'il n'autorise plus quittés. @param {any} e @returns {boolean} true si l'erreur est traitée ici
+   */
+  lostRights(e) {
+    if (!e || e.code !== 'forbidden') return false;
+    this.setState({ linkSheet: null, account: null });
+    const epoch = this.epoch;
+    this.loadMe().then((ok) => {
+      const me = this.state.me;
+      if (!ok || epoch !== this.epoch || !me) return;
+      /** @param {View} v */
+      const allowed = (v) => (v.type === 'invites' ? canInvite(me.role) : v.type === 'admin' ? me.role === 'admin' : true);
+      const i = this.state.stack.findIndex((v) => !allowed(v));
+      if (i >= 0) this.unwind(this.state.stack.length - i);
+      this.toast('Accès retiré');
+    });
+    return true;
+  }
+
+  // ---------- mon compte ----------
+  askDeleteSelf() { this.setState({ delSelf: { pw: '', show: false, busy: false, error: null, bad: null } }); }
+  /** @param {Partial<DelSelf>} patch */
+  setDelSelf(patch) { this.setState((/** @type {State} */ s) => (s.delSelf ? { delSelf: { ...s.delSelf, ...patch } } : null)); }
+  confirmDeleteSelf() {
+    const d = this.state.delSelf;
+    if (!d || d.busy || !d.pw) return;
+    this.setDelSelf({ busy: true, error: null, bad: null });
+    api.deleteMe(d.pw).then(() => this.signedOut('Compte supprimé'), (e) => {
+      if (e && e.status === 401) return;
+      this.setDelSelf({ busy: false, error: authErrorText(e), bad: authErrorField(e) });
+    });
+  }
+
+  /** Export (RGPD) : aperçu dans une feuille ; le téléchargement part du bouton (geste de l'utilisateur, exigé par Safari). */
+  openExport() {
+    if (this.state.exportSheet) return;
+    this.setState({ exportSheet: { data: null } });
+    const epoch = this.epoch;
+    api.exportMe('mes-series-' + this.today() + '.json').then(({ text, filename }) => {
+      let preview = text, sub = 'JSON';
+      try {
+        const o = JSON.parse(text);
+        preview = JSON.stringify(o, null, 2);
+        sub = plural(o.episodes_vus.length, 'épisode vu', 'épisodes vus') + ' · ' + plural(o.series.length, 'série', 'séries') + ' · JSON';
+      } catch { /* aperçu brut */ }
+      if (preview.length > 1600) preview = preview.slice(0, 1600) + '…';
+      this.setState((/** @type {State} */ s) => (s.exportSheet && epoch === this.epoch ? { exportSheet: { data: { text, preview, sub, filename } } } : null));
+    }, (e) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ exportSheet: null });
+      this.failToast(e, 'Chargement impossible');
+    });
+  }
+  downloadExport() {
+    const x = this.state.exportSheet;
+    if (!x || !x.data) return;
+    const url = URL.createObjectURL(new Blob([x.data.text], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = x.data.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---------- parrainages ----------
+  openInvites() { this.push({ type: 'invites', show: 0 }); }
+  loadInvites() {
+    return this.once('invites', () => this.read(() => api.invites(), (d) => this.setState({ invites: d.invites }),
+      (e) => { if (!this.lostRights(e) && !this.state.invites) this.setErr('invites', true); }));
+  }
+  createInvite() {
+    if (this.state.creatingInvite) return;
+    this.setState({ creatingInvite: true });
+    const epoch = this.epoch;
+    api.createInvite().then(({ invite, url }) => {
+      if (epoch !== this.epoch) return;
+      this.setState((/** @type {State} */ s) => ({
+        creatingInvite: false,
+        invites: s.invites ? [invite, ...s.invites.filter((x) => x.id !== invite.id)] : s.invites,
+        linkSheet: { title: 'Lien d’invitation', url, sub: 'Usage unique · expire ' + inDays(dayOf(invite.expiresAt, this.tz()), this.today()), inviteId: invite.id },
+      }));
+      if (!this.state.invites) this.loadInvites();
+    }, (e) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ creatingInvite: false });
+      this.failToast(e, 'Création impossible');
+    });
+  }
+  /** Lien en attente rouvert : le serveur n'en garde que l'empreinte, l'adresse n'est plus disponible. @param {any} inv */
+  openInvite(inv) {
+    const tz = this.tz(), today = this.today();
+    this.setState({ linkSheet: {
+      title: 'Lien d’invitation', url: null, inviteId: inv.id,
+      sub: 'Lien du ' + fShort(dayOf(inv.createdAt, tz), today) + ' · expire ' + inDays(dayOf(inv.expiresAt, tz), today),
+    } });
+  }
+  /** @param {number} id */
+  revokeInvite(id) {
+    if (this.revoking) return;
+    this.revoking = true;
+    const epoch = this.epoch;
+    api.revokeInvite(id).then(() => {
+      if (epoch !== this.epoch) return;
+      this.setState((/** @type {State} */ s) => ({ linkSheet: null, invites: s.invites && s.invites.map((x) => (x.id === id ? { ...x, status: 'revoked' } : x)) }));
+      this.toast('Lien révoqué');
+    }, (e) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ linkSheet: null });
+      if (e && e.code === 'invite_used') { this.toast('Ce lien vient de servir'); this.loadInvites(); }
+      else this.failToast(e, 'Révocation impossible');
+    }).finally(() => { this.revoking = false; });
+  }
+  // Partage natif du téléphone si disponible, sinon copie.
+  /** @param {string} url */
+  shareLink(url) {
+    if (navigator.share) navigator.share({ url }).catch(() => { /* partage annulé */ });
+    else this.copyLink(url);
+  }
+  /** Le résultat s'affiche sur le bouton lui-même (un toast serait caché sous la feuille). @param {string} url */
+  copyLink(url) {
+    /** @param {'ok' | 'fail'} r */
+    const done = (r) => this.setState((/** @type {State} */ s) => (s.linkSheet && s.linkSheet.url === url ? { linkSheet: { ...s.linkSheet, copied: r } } : null));
+    try { navigator.clipboard.writeText(url).then(() => done('ok'), () => done('fail')); } catch { done('fail'); }
+  }
+
+  // ---------- comptes (admin) ----------
+  openAdmin() { this.push({ type: 'admin', show: 0 }); }
+  loadUsers() {
+    return this.once('users', () => this.read(() => api.users(), (d) => this.setState({ users: d.users }),
+      (e) => { if (!this.lostRights(e) && !this.state.users) this.setErr('users', true); }));
+  }
+  /** @param {number} id @param {'membre' | 'parrain'} role */
+  setRole(id, role) {
+    const u = this.state.users && this.state.users.find((x) => x.id === id);
+    if (!u || u.role === role || u.role === 'admin') return;
+    const seqs = this.roleSeq;
+    const seq = (seqs[id] = (seqs[id] || 0) + 1);
+    const epoch = this.epoch;
+    /** @param {string} r */
+    const put = (r) => this.setState((/** @type {State} */ s) => ({ users: s.users && s.users.map((x) => (x.id === id ? { ...x, role: r } : x)) }));
+    put(role);
+    // Seule la réponse au dernier choix fait foi (deux taps rapides).
+    api.setUserRole(id, role).then((res) => {
+      if (epoch === this.epoch && seqs[id] === seq && res && res.user) put(res.user.role);
+    }, (e) => {
+      if (epoch !== this.epoch || seqs[id] !== seq) return;
+      // La feuille de compte est fermée : le toast passerait dessous.
+      this.setState((/** @type {State} */ s) => (s.account === id ? { account: null } : null));
+      this.failToast(e, 'Échec de l’enregistrement');
+      this.loadUsers();
+    });
+  }
+  /** @param {number} id */
+  createReset(id) {
+    const u = this.state.users && this.state.users.find((x) => x.id === id);
+    if (!u || this.state.resetBusy) return;
+    this.setState({ resetBusy: true });
+    const epoch = this.epoch;
+    api.resetLink(id).then(({ url }) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ resetBusy: false, account: null, linkSheet: { title: 'Réinitialisation · ' + u.username, url, sub: 'Usage unique · valable 24 h' } });
+    }, (e) => {
+      if (epoch !== this.epoch) return;
+      this.setState((/** @type {State} */ s) => ({ resetBusy: false, account: s.account === id ? null : s.account }));
+      this.failToast(e, 'Création impossible');
+    });
+  }
+  // Suppression (RGPD, droit à l'effacement) : les comptes qu'il a invités restent, affichés « invité par un compte supprimé ».
+  /** @param {number} id */
+  askDeleteUser(id) {
+    const u = this.state.users && this.state.users.find((x) => x.id === id);
+    if (!u) return;
+    const name = u.username;
+    this.setState({ account: null, confirm: {
+      title: 'Supprimer le compte de ' + name + ' ?',
+      text: 'Son historique de visionnage, ses séries suivies et ses liens d’invitation seront effacés définitivement.',
+      ok: 'Supprimer le compte', danger: true,
+      action: () => {
+        this.setState({ confirm: null });
+        const epoch = this.epoch;
+        api.deleteUser(id).then(() => {
+          if (epoch !== this.epoch) return;
+          this.setState((/** @type {State} */ s) => ({
+            users: s.users && s.users.filter((x) => x.id !== id).map((x) => (x.invitedBy === name ? { ...x, invitedBy: null, invitedByDeleted: true } : x)),
+            invites: s.invites && s.invites.map((x) => (x.usedBy === name ? { ...x, usedBy: null, usedByDeleted: true } : x)),
+          }));
+          this.toast('Compte de ' + name + ' supprimé');
+        }, (e) => {
+          if (epoch !== this.epoch) return;
+          this.failToast(e, 'Suppression impossible');
+        });
+      },
+    } });
+  }
+
   // ---------- recherche ----------
   /** @param {string} q */
   searchInput(q) {
@@ -679,6 +1055,8 @@ export class App extends Component {
   screenReady(st) {
     const top = st.stack[st.stack.length - 1];
     if (!top) return st.tab === 'decote' ? !!st.shelf : st.tab === 'series' ? !!st.mine : true;
+    if (top.type === 'invites') return !!st.invites;
+    if (top.type === 'admin') return !!st.users;
     if (top.type === 'show') return !!st.shows[top.show];
     return !!st.seasons[top.show + ':' + top.season];
   }
@@ -908,9 +1286,16 @@ export class App extends Component {
 
   /** @param {any} _props @param {any} st */
   render(_props, st) {
+    const toast = st.toast ? html`<div role="status" class="toast toast-in">
+        <span class="ell" style="flex: 1; min-width: 0; font-size: 13px">${st.toast.text}</span>
+        <button type="button" hidden=${!st.toast.undo} onClick=${st.toast.undo} style="flex: none; height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--accent); font: 700 13px var(--text); cursor: pointer">Annuler</button>
+      </div>` : null;
+    if (st.auth) return html`${viewAuth(this, st)}${toast}`;
     const top = st.stack[st.stack.length - 1];
     let screen;
-    if (top && top.type === 'show') screen = viewShow(this, st, top);
+    if (top && top.type === 'invites') screen = viewInvites(this, st);
+    else if (top && top.type === 'admin') screen = viewAdmin(this, st);
+    else if (top && top.type === 'show') screen = viewShow(this, st, top);
     else if (top && top.type === 'season') screen = viewSeason(this, st, top);
     else if (top && top.type === 'episode') screen = viewEpisode(this, st, top);
     else if (st.tab === 'decote') screen = viewDecote(this, st);
@@ -923,18 +1308,20 @@ export class App extends Component {
       this.viewAnim = this.lastView == null || st.tab !== this.lastTab ? '' : this.slideDir(this.lastTop, top, this.lastDepth, st.stack.length) + (this.lastTop && top ? ' v-keephdr' : '');
       this.lastView = vkey; this.lastTop = top; this.lastTab = st.tab; this.lastDepth = st.stack.length;
     }
+    const account = st.account != null && st.users ? st.users.find((/** @type {any} */ u) => u.id === st.account) : null;
     /** @param {string} id @param {string} label @param {any} icon */
-    const tab = (id, label, icon) => html`<button type="button" class="tab" aria-current=${st.tab === id ? 'page' : null} style="color: ${st.tab === id ? 'var(--accent)' : 'var(--muted)'}" onClick=${() => this.goTab(id)}>${icon}${label}</button>`;
+    const tab =(id, label, icon) => html`<button type="button" class="tab" aria-current=${st.tab === id ? 'page' : null} style="color: ${st.tab === id ? 'var(--accent)' : 'var(--muted)'}" onClick=${() => this.goTab(id)}>${icon}${label}</button>`;
     return html`
       <div class="main" ref=${this.setMain}><div key=${vkey} class=${'view ' + this.viewAnim}>${screen}</div></div>
-      ${st.toast ? html`<div role="status" class="toast toast-in">
-        <span class="ell" style="flex: 1; min-width: 0; font-size: 13px">${st.toast.text}</span>
-        <button type="button" hidden=${!st.toast.undo} onClick=${st.toast.undo} style="flex: none; height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--accent); font: 700 13px var(--text); cursor: pointer">Annuler</button>
-      </div>` : null}
+      ${toast}
       <nav class="tabs" aria-label="Onglets">
         ${tab('encours', 'En cours', I.tv())}${tab('decote', 'De côté', I.box())}${tab('series', 'Mes séries', I.search())}${tab('profil', 'Profil', I.user())}
       </nav>
       ${st.confirm ? confirmSheet(st.confirm, this.closeConfirm) : null}
-      ${st.picker ? pickerSheet(st.picker, this.closePicker) : null}`;
+      ${st.picker ? pickerSheet(st.picker, this.closePicker) : null}
+      ${st.linkSheet ? linkSheetView(this, st.linkSheet) : null}
+      ${st.exportSheet ? exportSheetView(this, st.exportSheet) : null}
+      ${account ? accountSheet(this, st, account) : null}
+      ${st.delSelf ? deleteSelfSheet(this, st.delSelf) : null}`;
   }
 }

@@ -1,4 +1,5 @@
 import type { Db } from '../db/index.ts';
+import type { Role } from '../domain/accounts.ts';
 import type { Follow } from '../domain/series.ts';
 
 // Accès SQL du suivi. Les listes d'ids passent en un seul paramètre JSON (json_each) : une requête par lot, pas de N+1.
@@ -9,25 +10,195 @@ const one = <T>(db: Db, sql: string, ...params: (string | number | null)[]) => d
 
 // ---------- utilisateurs ----------
 
-export type UserRow = { id: number; username: string; country: string; timezone: string; shelveAfterDays: number };
-const USER_COLS = 'id, username, country, timezone, shelve_after_days AS shelveAfterDays';
+export type UserRow = { id: number; username: string; role: Role; country: string; timezone: string; shelveAfterDays: number };
+const USER_COLS = 'u.id, u.username, u.role, u.country, u.timezone, u.shelve_after_days AS shelveAfterDays';
 
 export function getUser(db: Db, id: number): UserRow | undefined {
-  return one<UserRow>(db, `SELECT ${USER_COLS} FROM users WHERE id = ?`, id);
+  return one<UserRow>(db, `SELECT ${USER_COLS} FROM users u WHERE u.id = ?`, id);
 }
 
-// Crée le compte s'il n'existe pas (mot de passe inutilisable), puis le renvoie.
-export function ensureUser(db: Db, username: string, nowIso: string): UserRow {
-  db.prepare(`INSERT INTO users (username, pw_hash, created_at) VALUES (?, '!', ?) ON CONFLICT (username) DO NOTHING`).run(username, nowIso);
-  return one<UserRow>(db, `SELECT ${USER_COLS} FROM users WHERE username = ?`, username) as UserRow;
+export type AccountRow = UserRow & { pwHash: string };
+
+export function getAccount(db: Db, id: number): AccountRow | undefined {
+  return one<AccountRow>(db, `SELECT ${USER_COLS}, u.pw_hash AS pwHash FROM users u WHERE u.id = ?`, id);
 }
+
+export function getAccountByKey(db: Db, key: string): AccountRow | undefined {
+  return one<AccountRow>(db, `SELECT ${USER_COLS}, u.pw_hash AS pwHash FROM users u WHERE u.username_key = ?`, key);
+}
+
+// pwHash '!' = mot de passe inutilisable (compte à initialiser par un lien de réinitialisation).
+export function insertUser(db: Db, u: {
+  username: string; usernameKey: string; pwHash: string; role: Role; invitedBy: number | null; createdAt: string;
+}): number {
+  const row = one<{ id: number }>(db, `INSERT INTO users (username, username_key, pw_hash, role, invited_by, created_at)
+    VALUES (?, ?, ?, ?, ?, ?) RETURNING id`, u.username, u.usernameKey, u.pwHash, u.role, u.invitedBy, u.createdAt);
+  return (row as { id: number }).id;
+}
+
+export function setPasswordHash(db: Db, id: number, pwHash: string): void {
+  db.prepare('UPDATE users SET pw_hash = ? WHERE id = ?').run(pwHash, id);
+}
+
+export function setUserRole(db: Db, id: number, role: Role): void {
+  db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id);
+}
+
+export function countAdmins(db: Db): number {
+  return (one<{ n: number }>(db, `SELECT count(*) AS n FROM users WHERE role = 'admin'`) as { n: number }).n;
+}
+
+// Efface le compte et tout ce qui lui appartient. Ses invitations restent (created_by / used_by passent à NULL).
+export function deleteUserAndData(db: Db, id: number): void {
+  for (const table of ['watched', 'user_shows', 'sessions', 'reset_tokens']) db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id);
+  db.prepare('DELETE FROM users WHERE id = ?').run(id);
+}
+
+export type AccountListRow = {
+  id: number; username: string; role: Role; createdAt: string; invitedBy: string | null; invitedByDeleted: number;
+  followedCount: number; watchedCount: number;
+};
+
+// invitedByDeleted : le compte est entré par une invitation dont le créateur a été supprimé.
+export function listAccounts(db: Db, id: number | null = null): AccountListRow[] {
+  return all<AccountListRow>(db, `SELECT u.id, u.username, u.role, u.created_at AS createdAt, p.username AS invitedBy,
+      EXISTS (SELECT 1 FROM invites i WHERE i.used_by = u.id AND i.created_by IS NULL) AS invitedByDeleted,
+      (SELECT count(*) FROM user_shows us WHERE us.user_id = u.id) AS followedCount,
+      (SELECT count(*) FROM watched w WHERE w.user_id = u.id) AS watchedCount
+    FROM users u LEFT JOIN users p ON p.id = u.invited_by
+    WHERE ? IS NULL OR u.id = ?
+    ORDER BY u.created_at, u.id`, id, id);
+}
+
+// ---------- sessions ----------
+
+export type SessionRow = { user: UserRow; expiresAt: string; lastSeenAt: string };
+
+export function insertSession(db: Db, tokenHash: string, userId: number, nowIso: string, expiresAt: string): void {
+  db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?)')
+    .run(tokenHash, userId, nowIso, expiresAt, nowIso);
+}
+
+export function getSession(db: Db, tokenHash: string): SessionRow | undefined {
+  const row = one<UserRow & { expiresAt: string; lastSeenAt: string }>(db, `SELECT ${USER_COLS}, s.expires_at AS expiresAt,
+    s.last_seen_at AS lastSeenAt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, tokenHash);
+  if (!row) return undefined;
+  const { expiresAt, lastSeenAt, ...user } = row;
+  return { user, expiresAt, lastSeenAt };
+}
+
+export function touchSession(db: Db, tokenHash: string, nowIso: string, expiresAt: string): void {
+  db.prepare('UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?').run(nowIso, expiresAt, tokenHash);
+}
+
+export function deleteSession(db: Db, tokenHash: string): void {
+  db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
+}
+
+export function deleteUserSessions(db: Db, userId: number): void {
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+}
+
+export function deleteExpiredSessions(db: Db, nowIso: string): void {
+  db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(nowIso);
+}
+
+// ---------- invitations ----------
+
+export type InviteRow = {
+  id: number; createdBy: number | null; createdByName: string | null; createdAt: string; expiresAt: string;
+  usedAt: string | null; usedByName: string | null; revokedAt: string | null;
+};
+const INVITE_SELECT = `SELECT i.id, i.created_by AS createdBy, c.username AS createdByName, i.created_at AS createdAt,
+  i.expires_at AS expiresAt, i.used_at AS usedAt, ub.username AS usedByName, i.revoked_at AS revokedAt
+  FROM invites i LEFT JOIN users c ON c.id = i.created_by LEFT JOIN users ub ON ub.id = i.used_by`;
+
+export function insertInvite(db: Db, codeHash: string, createdBy: number, nowIso: string, expiresAt: string): number {
+  const row = one<{ id: number }>(db, `INSERT INTO invites (code_hash, created_by, created_at, expires_at) VALUES (?, ?, ?, ?) RETURNING id`,
+    codeHash, createdBy, nowIso, expiresAt);
+  return (row as { id: number }).id;
+}
+
+export function getInvite(db: Db, id: number): InviteRow | undefined {
+  return one<InviteRow>(db, `${INVITE_SELECT} WHERE i.id = ?`, id);
+}
+
+export function getInviteByHash(db: Db, codeHash: string): InviteRow | undefined {
+  return one<InviteRow>(db, `${INVITE_SELECT} WHERE i.code_hash = ?`, codeHash);
+}
+
+// Du plus récent au plus ancien.
+export function listInvitesBy(db: Db, createdBy: number): InviteRow[] {
+  return all<InviteRow>(db, `${INVITE_SELECT} WHERE i.created_by = ? ORDER BY i.created_at DESC, i.id DESC`, createdBy);
+}
+
+// Marque l'invitation utilisée si elle est encore en attente. Renvoie false sinon (déjà utilisée, révoquée ou expirée).
+export function useInvite(db: Db, id: number, userId: number, nowIso: string): boolean {
+  return Number(db.prepare(`UPDATE invites SET used_by = ?, used_at = ?
+    WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`).run(userId, nowIso, id, nowIso).changes) === 1;
+}
+
+// Sans effet sur un lien utilisé, déjà révoqué ou expiré (son statut reste celui-là).
+export function revokeInvite(db: Db, id: number, nowIso: string): void {
+  db.prepare('UPDATE invites SET revoked_at = ? WHERE id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?').run(nowIso, id, nowIso);
+}
+
+// Révoque les liens encore en attente d'un parrain.
+export function revokePendingInvites(db: Db, createdBy: number, nowIso: string): void {
+  db.prepare(`UPDATE invites SET revoked_at = ? WHERE created_by = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?`)
+    .run(nowIso, createdBy, nowIso);
+}
+
+// ---------- réinitialisation du mot de passe ----------
+
+export type ResetRow = { userId: number; username: string; expiresAt: string; usedAt: string | null };
+
+// Remplace tout lien précédent du compte.
+export function replaceResetToken(db: Db, tokenHash: string, userId: number, nowIso: string, expiresAt: string): void {
+  db.prepare('DELETE FROM reset_tokens WHERE user_id = ?').run(userId);
+  db.prepare('INSERT INTO reset_tokens (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').run(tokenHash, userId, nowIso, expiresAt);
+}
+
+export function getResetToken(db: Db, tokenHash: string): ResetRow | undefined {
+  return one<ResetRow>(db, `SELECT r.user_id AS userId, u.username, r.expires_at AS expiresAt, r.used_at AS usedAt
+    FROM reset_tokens r JOIN users u ON u.id = r.user_id WHERE r.token_hash = ?`, tokenHash);
+}
+
+// Marque le lien utilisé s'il est encore valide. Renvoie false sinon.
+export function useResetToken(db: Db, tokenHash: string, nowIso: string): boolean {
+  return Number(db.prepare('UPDATE reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?')
+    .run(nowIso, tokenHash, nowIso).changes) === 1;
+}
+
+// ---------- export des données ----------
+
+export type ExportShowRow = { showId: number; name: string; state: Follow['state'] };
+
+export function getExportShows(db: Db, userId: number): ExportShowRow[] {
+  return all<ExportShowRow>(db, `SELECT s.id AS showId, s.name, us.state FROM user_shows us JOIN shows s ON s.id = us.show_id
+    WHERE us.user_id = ? ORDER BY s.name, s.id`, userId);
+}
+
+export type ExportWatchedRow = {
+  showId: number; episodeId: number; showName: string; season: number; number: number; title: string | null; watchedAt: string;
+};
+
+// Retirés compris (removed_at) : l'historique se garde en entier.
+export function getExportWatched(db: Db, userId: number): ExportWatchedRow[] {
+  return all<ExportWatchedRow>(db, `SELECT e.show_id AS showId, e.id AS episodeId, s.name AS showName, e.season, e.number,
+      e.title, w.watched_at AS watchedAt
+    FROM watched w JOIN episodes e ON e.id = w.episode_id JOIN shows s ON s.id = e.show_id
+    WHERE w.user_id = ? ORDER BY w.watched_at, e.show_id, e.season, e.number`, userId);
+}
+
+// ---------- réglages ----------
 
 export type UserSettingsRow = {
-  username: string; country: string; shelveAfterDays: number; notifOn: number; notifHour: number; timezone: string;
+  username: string; role: Role; country: string; shelveAfterDays: number; notifOn: number; notifHour: number; timezone: string;
 };
 
 export function getUserSettings(db: Db, id: number): UserSettingsRow | undefined {
-  return one<UserSettingsRow>(db, `SELECT username, country, shelve_after_days AS shelveAfterDays, notif_on AS notifOn,
+  return one<UserSettingsRow>(db, `SELECT username, role, country, shelve_after_days AS shelveAfterDays, notif_on AS notifOn,
     notif_hour AS notifHour, timezone FROM users WHERE id = ?`, id);
 }
 

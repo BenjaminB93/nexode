@@ -2,7 +2,7 @@
 // Éléments d'interface partagés par les vues (fonctions → vnode, sans état propre).
 import { html } from '../vendor/htm-preact-3.1.1.js';
 import { I } from './icons.js';
-import { logoUrl, posterUrl } from './format.js';
+import { ROLES, logoUrl, posterUrl } from './format.js';
 
 /** @param {Event} ev */
 const dropBroken = (ev) => { /** @type {HTMLImageElement} */ (ev.currentTarget).removeAttribute('src'); };
@@ -48,7 +48,8 @@ export function segmented(label, segs, cur, onPick, style) {
 
 /**
  * Feuille en bas d'écran ; toucher le fond referme sans rien changer.
- * @param {string} title @param {string | null} sub @param {() => void} onClose @param {any} content
+ * @param {string} title @param {any} sub texte (ou bloc réservé pendant un chargement), null = aucun
+ * @param {() => void} onClose @param {any} content
  */
 export function sheet(title, sub, onClose, content) {
   return html`<div class="overlay backdrop-in" onClick=${onClose}>
@@ -78,17 +79,88 @@ export function pickerSheet(p, onClose) {
 }
 
 /**
- * Confirmation (coche de saison).
- * @param {{ title: string, text: string, ok: string, action: () => void }} c @param {() => void} onCancel
+ * Confirmation (coche de saison, suppression de compte). danger = bouton rouge.
+ * @param {{ title: string, text: string, ok: string, action: () => void, danger?: boolean }} c @param {() => void} onCancel
  */
 export function confirmSheet(c, onCancel) {
   return html`<div class="overlay backdrop-in">
     <div role="dialog" class="sheetbox sheet-in" aria-modal="true" aria-label=${c.title} style="padding: 22px 16px calc(24px + var(--safe-bottom)); gap: 10px">
       <h2 class="sheet-title">${c.title}</h2>
       <p style="margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: var(--soft)">${c.text}</p>
-      <button type="button" class="btn btn-primary press" onClick=${() => c.action()}>${c.ok}</button>
+      <button type="button" class="btn btn-primary press" style=${c.danger ? DANGER_BTN : null} onClick=${() => c.action()}>${c.ok}</button>
       <button type="button" class="btn btn-ghost" style="height: 48px; font-size: 14px; font-weight: 600" onClick=${onCancel}>Annuler</button>
     </div>
+  </div>`;
+}
+
+/** Bouton principal d'une action destructrice. */
+export const DANGER_BTN = 'background: var(--danger); color: var(--on-danger)';
+
+/**
+ * Champ de saisie (connexion, inscription, confirmation par mot de passe). invalid = bordure rouge (même épaisseur).
+ * @param {{ id: string, label: string, value: string, onInput: (v: string) => void, type?: string, autocomplete?: string, extra?: any, invalid?: boolean, plain?: boolean }} f
+ * plain : nom d'utilisateur (ni majuscule automatique ni correction)
+ */
+export function field(f) {
+  return html`<label for=${f.id} style="display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 13px; font-weight: 600; color: var(--soft)">${f.label}</span>
+    <span style="height: 50px; box-sizing: border-box; border-radius: 12px; border: 1px solid ${f.invalid ? 'var(--danger)' : 'var(--line2)'}; background: var(--card); display: flex; align-items: center; padding: 0 4px 0 14px">
+      <input id=${f.id} type=${f.type || 'text'} value=${f.value} autocomplete=${f.autocomplete || 'off'}
+        autocapitalize=${f.plain ? 'none' : null} autocorrect=${f.plain ? 'off' : null} spellcheck=${f.plain ? false : null}
+        onInput=${(/** @type {Event} */ ev) => f.onInput(/** @type {HTMLInputElement} */ (ev.currentTarget).value)}
+        style="flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--fg); font: 500 16px var(--text)" />${f.extra || null}
+    </span>
+  </label>`;
+}
+
+/**
+ * Mot de passe avec bouton pour l'afficher.
+ * @param {{ id: string, label: string, value: string, shown: boolean, onInput: (v: string) => void, onToggle: () => void, autocomplete: string, invalid?: boolean }} p
+ */
+export function passwordField(p) {
+  return field({
+    id: p.id, label: p.label, value: p.value, onInput: p.onInput, type: p.shown ? 'text' : 'password', autocomplete: p.autocomplete, invalid: p.invalid, plain: true,
+    extra: html`<button type="button" class="iconbtn" aria-label=${p.shown ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} aria-pressed=${p.shown ? 'true' : 'false'} style="color: var(--muted)" onClick=${p.onToggle}>${p.shown ? I.eyeOff() : I.eye()}</button>`,
+  });
+}
+
+/** Message d'erreur d'un formulaire : ligne toujours réservée, rien ne bouge quand il apparaît. @param {string | null} text */
+export function formError(text) {
+  return html`<span aria-live="polite" style="min-height: 18px; font-size: 13px; line-height: 18px; color: var(--danger)">${text || ''}</span>`;
+}
+
+/** Pastille de rôle (absente si le rôle est inconnu). @param {string | null | undefined} role */
+export function roleChip(role) {
+  const c = role ? ROLES[role] : null;
+  return c ? html`<span style="flex: none; padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: ${c[1]}; color: ${c[2]}">${c[0]}</span>` : null;
+}
+
+/** Initiale dans un rond. @param {string} name @param {number} [size] */
+export function avatar(name, size) {
+  const z = size || 40;
+  return html`<span aria-hidden="true" style="flex: none; width: ${z}px; height: ${z}px; border-radius: ${z / 2}px; background: var(--chip); color: var(--soft); font: 700 ${Math.round(z * 0.4)}px var(--display); display: flex; align-items: center; justify-content: center">${name.charAt(0).toUpperCase()}</span>`;
+}
+
+/**
+ * Ligne de liste (parrainages, comptes) : pastille, titre, sous-titre, élément à droite ; cliquable si onClick.
+ * @param {any} lead @param {string} title @param {string} sub @param {any} right @param {(() => void) | null} onClick @param {boolean} [faded]
+ */
+export function listRow(lead, title, sub, right, onClick, faded) {
+  const inner = html`${lead}<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+      <span class="ell" style="font-size: 15px; font-weight: 600">${title}</span>
+      <span class="ell" style="font-size: 12px; color: var(--muted)">${sub}</span>
+    </span>${right}`;
+  const style = 'min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 4px; opacity: ' + (faded ? 0.55 : 1);
+  return onClick
+    ? html`<button type="button" onClick=${onClick} style="${style}; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">${inner}</button>`
+    : html`<div style=${style}>${inner}</div>`;
+}
+
+/** Ligne de liste réservée pendant un chargement. */
+export function listRowPlaceholder() {
+  return html`<div aria-hidden="true" style="min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 4px">
+    <span class="ph-line" style="flex: none; width: 40px; height: 40px; border-radius: 20px"></span>
+    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px">${phLine(140, 13)}${phLine(100, 10)}</span>
   </div>`;
 }
 

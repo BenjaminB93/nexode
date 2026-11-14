@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../src/http/app.ts';
+import { addUser, sessionCookie } from './helpers/auth.ts';
 import { type ShowFixture, FakeCatalog, epId, seedShow, testDb } from './helpers/fake-catalog.ts';
 
 const NOW = '2026-11-13T12:00:00.000Z';
@@ -11,30 +12,21 @@ const SEV: ShowFixture = {
 };
 const FINIE: ShowFixture = { id: 1002, name: 'Finie', status: 'ended', seasons: [['2025-01-01', '2025-01-08']] };
 
-function setup(opts: { devUser?: boolean; withCatalog?: boolean } = {}) {
+// Requêtes faites avec la session d'un compte Membre 'dev'.
+function setup(opts: { withCatalog?: boolean } = {}) {
   const db = testDb();
   const catalog = new FakeCatalog(db, [SEV, FINIE]);
   let now = new Date(NOW);
-  const app = createApp({ db, catalog: opts.withCatalog === false ? undefined : catalog, devUser: opts.devUser ?? true, now: () => now });
+  const app = createApp({ db, catalog: opts.withCatalog === false ? undefined : catalog, now: () => now });
+  const cookie = sessionCookie(db, addUser(db, 'dev'), NOW);
   const call = async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
-    const init: RequestInit = { method, headers: { ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers } };
+    const init: RequestInit = { method, headers: { cookie, ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers } };
     if (body !== undefined) init.body = typeof body === 'string' ? body : JSON.stringify(body);
     const res = await app.request(path, init);
     return { status: res.status, body: (await res.json()) as any };
   };
   return { db, catalog, app, call, setNow: (iso: string) => { now = new Date(iso); } };
 }
-
-test('sans devUser : 401 partout sauf /api/health', async () => {
-  const { call } = setup({ devUser: false });
-  assert.equal((await call('GET', '/api/health')).status, 200);
-  for (const [m, p] of [['GET', '/api/timeline'], ['GET', '/api/shows/1001'], ['PUT', '/api/watched/1']] as const) {
-    const r = await call(m, p, m === 'PUT' ? {} : undefined);
-    assert.equal(r.status, 401, `${m} ${p}`);
-    assert.deepEqual(r.body, { error: 'unauthorized' });
-  }
-  assert.equal((await call('GET', '/api/nope')).status, 404);
-});
 
 test('parcours complet : recherche, suivre, timeline, vu, annuler, historique', async () => {
   const { call } = setup();
@@ -196,16 +188,16 @@ test('GET /api/me : forme et valeurs par défaut', async () => {
   const { call } = setup();
   const r = await call('GET', '/api/me');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(r.body, { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
 });
 
 test('PATCH /api/me : champs facultatifs, persistance, réponse = GET /api/me', async () => {
   const { call } = setup();
   const a = await call('PATCH', '/api/me', { country: 'CH', notifOn: false });
   assert.equal(a.status, 200);
-  assert.deepEqual(a.body, { username: 'dev', country: 'CH', shelveAfterDays: 30, notifOn: false, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(a.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 30, notifOn: false, notifHour: 9, timezone: 'Europe/Paris' });
   const b = await call('PATCH', '/api/me', { shelveAfterDays: 15, notifHour: 23 });
-  assert.deepEqual(b.body, { username: 'dev', country: 'CH', shelveAfterDays: 15, notifOn: false, notifHour: 23, timezone: 'Europe/Paris' });
+  assert.deepEqual(b.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 15, notifOn: false, notifHour: 23, timezone: 'Europe/Paris' });
   assert.deepEqual((await call('PATCH', '/api/me', {})).body, b.body);
   assert.deepEqual((await call('GET', '/api/me')).body, b.body);
   for (const country of ['FR', 'BE', 'CH', 'CA']) assert.equal((await call('PATCH', '/api/me', { country })).body.country, country);
@@ -259,4 +251,39 @@ test('GET /api/timeline : upNext (3 au plus, ordre saison/numéro, sortis et non
   const end = (await call('GET', '/api/timeline')).body.toWatch.find((x: any) => x.show.id === BIG);
   assert.equal(end.next.id, epId(BIG, 2, 2));
   assert.deepEqual(end.upNext, []);
+});
+
+test('deux comptes : B ne voit ni ne modifie les séries et l\'historique de A', async () => {
+  const { db, call } = setup();
+  const b = { cookie: sessionCookie(db, addUser(db, 'b'), NOW) };
+  const asB = (method: string, path: string, body?: unknown) => call(method, path, body, b);
+  const e1 = epId(1001, 1, 1);
+
+  await call('PUT', '/api/shows/1001/relation', { to: 'on' });
+  await call('PUT', `/api/watched/${e1}`, {});
+  await call('PUT', '/api/shows/1002/relation', { to: 'shelf' });
+
+  const tl = (await asB('GET', '/api/timeline')).body;
+  assert.deepEqual([tl.toWatch, tl.upcoming], [[], []]);
+  assert.deepEqual((await asB('GET', '/api/history')).body.items, []);
+  assert.deepEqual((await asB('GET', '/api/my-shows')).body.shows, []);
+  const shelfB = (await asB('GET', '/api/shelf')).body;
+  assert.deepEqual([shelfB.notStarted, shelfB.abandoned], [[], []]);
+  const detailB = (await asB('GET', '/api/shows/1001')).body;
+  assert.deepEqual([detailB.relation, detailB.seen], ['none', 0]);
+  assert.deepEqual((await asB('GET', '/api/shows/1001/seasons/1')).body.episodes.map((e: any) => e.watchedAt), [null, null, null]);
+
+  // Écritures de B : rien ne bouge chez A.
+  assert.deepEqual((await asB('DELETE', `/api/watched/${e1}`)).body.removed, []);
+  assert.deepEqual((await asB('POST', '/api/watched/batch', { on: false, episodeIds: [e1] })).body.removed, []);
+  await asB('PUT', '/api/shows/1001/relation', { to: 'none' });
+  const detailA = (await call('GET', '/api/shows/1001')).body;
+  assert.deepEqual([detailA.relation, detailA.seen], ['on', 1]);
+  assert.deepEqual((await call('GET', '/api/history')).body.items.map((i: any) => i.episodeId), [e1]);
+  assert.deepEqual((await call('GET', '/api/my-shows')).body.shows.map((r: any) => r.name), ['Finie', 'Severance']);
+
+  // Et inversement : ce que B marque n'apparaît pas chez A.
+  await asB('PUT', `/api/watched/${epId(1001, 1, 2)}`, {});
+  assert.deepEqual((await call('GET', '/api/history')).body.items.map((i: any) => i.episodeId), [e1]);
+  assert.equal((await asB('GET', '/api/shows/1001')).body.seen, 1);
 });
