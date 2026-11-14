@@ -1,0 +1,29 @@
+{
+ "url": "/search/tv?include_adult=false&language=fr-FR&query=the+last+of+us",
+ "body": {
+  "page": 1,
+  "results": [
+   {
+    "id": 100088,
+    "name": "The Last of Us",
+    "original_name": "The Last of Us",
+    "first_air_date": "2023-01-15",
+    "poster_path": "/4pMd9VAdqm96KA2W4X8yetgc7EF.jpg"
+   },
+   {
+    "id": 62141,
+    "name": "The Last of Us Development Series",
+    "original_name": "The Last of Us Development Series",
+    "first_air_date": "2013-02-28",
+    "poster_path": null
+   },
+   {
+    "id": 67834,
+    "name": "Hollywood Autopsy",
+    "original_name": "Autopsy: The Last Hours of...",
+    "first_air_date": "2014-01-07",
+    "poster_path": "/cSqKkfHiEJGHaWpZaOgjQeOE08b.jpg"
+   }
+  ]
+ }
+}

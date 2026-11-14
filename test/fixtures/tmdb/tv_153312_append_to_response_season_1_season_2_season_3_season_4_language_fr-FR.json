@@ -1,0 +1,471 @@
+{
+ "url": "/tv/153312?append_to_response=season/1,season/2,season/3,season/4&language=fr-FR",
+ "body": {
+  "id": 153312,
+  "name": "Tulsa King",
+  "original_name": "Tulsa King",
+  "original_language": "en",
+  "first_air_date": "2022-11-13",
+  "status": "Returning Series",
+  "poster_path": "/oyovexqrZRbafJNlNb5Sxgp9exQ.jpg",
+  "overview": "Dwight Manfredi, surnommé « Le Général », vient de sortir de prison où il a passé 25 ans. Cet ancien membre de la mafia …",
+  "seasons": [
+   {
+    "season_number": 0,
+    "name": "Épisodes spéciaux",
+    "episode_count": 1,
+    "air_date": "2022-11-11"
+   },
+   {
+    "season_number": 1,
+    "name": "Saison 1",
+    "episode_count": 9,
+    "air_date": "2022-11-13"
+   },
+   {
+    "season_number": 2,
+    "name": "Saison 2",
+    "episode_count": 10,
+    "air_date": "2024-09-15"
+   },
+   {
+    "season_number": 3,
+    "name": "Saison 3",
+    "episode_count": 10,
+    "air_date": "2025-09-21"
+   },
+   {
+    "season_number": 4,
+    "name": "Saison 4",
+    "episode_count": 10,
+    "air_date": "2026-10-16"
+   }
+  ],
+  "season/1": {
+   "season_number": 1,
+   "name": "Saison 1",
+   "air_date": "2022-11-13",
+   "poster_path": "/k7QpqEDcwOuw2tqFvnHOel6xncK.jpg",
+   "overview": "Fraîchement libéré de prison après une peine de 25 ans, l'ex-parrain de la mafia new-yorkaise Dwight Manfredi, dit \"Le G…",
+   "episodes": [
+    {
+     "id": 3728888,
+     "season_number": 1,
+     "episode_number": 1,
+     "name": "À l'ouest, l'ancêtre",
+     "air_date": "2022-11-13",
+     "runtime": 42,
+     "still_path": "/dOe72mwnTFg6ec4gX8szoNgafEr.jpg",
+     "overview": "Dwight, aveuglé par la nouvelle que sa famille mafieuse n'a plus de travail pour lui à New York, est envoyé à Tulsa, Okl…"
+    },
+    {
+     "id": 3728890,
+     "season_number": 1,
+     "episode_number": 2,
+     "name": "Le centre de l'univers",
+     "air_date": "2022-11-20",
+     "runtime": 38,
+     "still_path": "/2CpHeTMQQJjgIAWXE3VyPeUPmux.jpg",
+     "overview": "Dwight, Tyson et Bodhi partent en voyage pour s'occuper de certaines affaires. Stacy fouille dans le passé de Dwight."
+    },
+    {
+     "id": 3941042,
+     "season_number": 1,
+     "episode_number": 3,
+     "name": "La Chevrolet",
+     "air_date": "2022-11-27",
+     "runtime": 40,
+     "still_path": "/ntW59Upv7ihGxHgYLTQDNYu5y4b.jpg",
+     "overview": "Dwight entrevoit une occasion de faire une affaire juteuse. Un test de routine prend une tournure inattendue et violente…"
+    },
+    {
+     "id": 3947224,
+     "season_number": 1,
+     "episode_number": 4,
+     "name": "Une question de territoire",
+     "air_date": "2022-12-04",
+     "runtime": 40,
+     "still_path": "/jTesVrxg1CkdKYHeQsYDOYDAW2R.jpg",
+     "overview": "À la Tulsa Arena, Dwight et sa société testent leur nouveau plan, jusqu'à ce qu'un barrage routier les oblige à s'adapte…"
+    },
+    {
+     "id": 3947225,
+     "season_number": 1,
+     "episode_number": 5,
+     "name": "Une histoire de frangins",
+     "air_date": "2022-12-11",
+     "runtime": 37,
+     "still_path": "/ef8FQKmaxMVyj19JubHl3mgOdIB.jpg",
+     "overview": "Dwight retourne à New York dans des circonstances malheureuses, où ses retrouvailles avec sa fille et sa famille ne se p…"
+    },
+    {
+     "id": 4091915,
+     "season_number": 1,
+     "episode_number": 6,
+     "name": "Une écurie solide",
+     "air_date": "2022-12-18",
+     "runtime": 40,
+     "still_path": "/pvsWgF9Q8KEKq1AAFXqt3mx1YB3.jpg",
+     "overview": "Dwight rend visite à Tina avant de retourner à Tulsa. Pete accepte d'envoyer Goodie en Oklahoma, tandis que Roxy tente d…"
+    },
+    {
+     "id": 4099421,
+     "season_number": 1,
+     "episode_number": 7,
+     "name": "Warr Acres",
+     "air_date": "2022-12-25",
+     "runtime": 43,
+     "still_path": "/bodFvKO9iKvtdzWG2E4MnBRtpRU.jpg",
+     "overview": "Stacy prend une décision lourde de conséquences. Dwight et Armand disposent de preuves et Bodhi propose un nouveau plan.…"
+    },
+    {
+     "id": 4099422,
+     "season_number": 1,
+     "episode_number": 8,
+     "name": "Murs d'Adobe",
+     "air_date": "2023-01-01",
+     "runtime": 37,
+     "still_path": "/eCvaXeQvzDjxYPC9Vxv4va7RLGD.jpg",
+     "overview": "Dwight et Bodhi présentent le plan du casino de Jimmy. Alors que la pression augmente, Dwight, Mitch et Tyson rassemblen…"
+    },
+    {
+     "id": 4099423,
+     "season_number": 1,
+     "episode_number": 9,
+     "name": "Bonne chance",
+     "air_date": "2023-01-08",
+     "runtime": 43,
+     "still_path": "/5kme01g9nQhOwxaLs4corudfpoe.jpg",
+     "overview": "Tout est sur le pont alors que les tensions entre l'équipage de Dwight et Waltrip s'intensifient au-delà du point de non…"
+    }
+   ]
+  },
+  "season/2": {
+   "season_number": 2,
+   "name": "Saison 2",
+   "air_date": "2024-09-15",
+   "poster_path": "/ac4dDfHVwUeDCLPDxiWDgPX6Ews.jpg",
+   "overview": "Dwight continue à développer son Empire à Tulsa, mais au moment où son équipe prend ses repères, une guerre de territoir…",
+   "episodes": [
+    {
+     "id": 5438003,
+     "season_number": 2,
+     "episode_number": 1,
+     "name": "De nouveau en selle",
+     "air_date": "2024-09-15",
+     "runtime": 43,
+     "still_path": "/aKybcN7eYWrsd3oDB0Y1atTDLrq.jpg",
+     "overview": "Dwight continue à développer son Empire à Tulsa, mais au moment où son équipe prend ses repères, une guerre de territoir…"
+    },
+    {
+     "id": 5559325,
+     "season_number": 2,
+     "episode_number": 2,
+     "name": "Le blues de Kansas City",
+     "air_date": "2024-09-22",
+     "runtime": 44,
+     "still_path": "/j7tEgHboQDBgarQOLLVkpmZqf31.jpg",
+     "overview": "Un membre de la famille du passé de Dwight le surprend ; son succès attire l'attention."
+    },
+    {
+     "id": 5559326,
+     "season_number": 2,
+     "episode_number": 3,
+     "name": "Oklahoma contre Manfredi",
+     "air_date": "2024-09-29",
+     "runtime": 43,
+     "still_path": "/cWFAqz2f4AucLuVc3qIj3fPYjsK.jpg",
+     "overview": "Dwight Mandredi a une rencontre houleuse avec Bill Bevilaqua, le boss d'une famille de Kansas City, et son destin lui es…"
+    },
+    {
+     "id": 5559327,
+     "season_number": 2,
+     "episode_number": 4,
+     "name": "Les gentils et les méchants",
+     "air_date": "2024-10-06",
+     "runtime": 45,
+     "still_path": "/x49IrHqr9ZYLklIG8I2ZSz4TtrN.jpg",
+     "overview": "Dwight et Body explorent une nouvelle opportunité d'investissement. Pendant ce temps, Thresher apprend jusqu'où il peut …"
+    },
+    {
+     "id": 5559328,
+     "season_number": 2,
+     "episode_number": 5,
+     "name": "Se battre contre des moulins à vent",
+     "air_date": "2024-10-13",
+     "runtime": 40,
+     "still_path": "/qcFKPnlM6FIsQA8pLQJ3DxUhbdr.jpg",
+     "overview": "Thresher passe à l'attaque à l'égard des membres de la bande de Dwight, tandis que la tension monte avec la famille mafi…"
+    },
+    {
+     "id": 5559329,
+     "season_number": 2,
+     "episode_number": 6,
+     "name": "Navigateur",
+     "air_date": "2024-10-20",
+     "runtime": 38,
+     "still_path": "/lA1lXgbX08rDgXVgOcKIG8kHKcO.jpg",
+     "overview": "Dwight s'assoit à la table des négociations avec Kansas City et New York. Tyson veut que sa famille soit fière de lui, m…"
+    },
+    {
+     "id": 5559330,
+     "season_number": 2,
+     "episode_number": 7,
+     "name": "Survie",
+     "air_date": "2024-10-27",
+     "runtime": 40,
+     "still_path": "/xb3qUdeVgeR95YB8eQHgUz0prnp.jpg",
+     "overview": "Dwight et son équipe cherchent le responsable de la récente attaque. La dynamique du pouvoir au sein de la mafia de New …"
+    },
+    {
+     "id": 5559331,
+     "season_number": 2,
+     "episode_number": 8,
+     "name": "Nouvelle direction",
+     "air_date": "2024-11-03",
+     "runtime": 43,
+     "still_path": "/pYwQAxFeTVcXcPWHg86Jr9P1NCD.jpg",
+     "overview": "Bevilaqua prépare sa vengeance. Thresher et Ming discutent d'un nouvel arrangement."
+    },
+    {
+     "id": 5559332,
+     "season_number": 2,
+     "episode_number": 9,
+     "name": "Les triades",
+     "air_date": "2024-11-10",
+     "runtime": 37,
+     "still_path": "/2HPELYiW5rhReFwo7CplwY2j4o5.jpg",
+     "overview": "Margaret se retrouve mêlée aux affaires de Dwight, d'où s'ensuivent des problèmes au Ranch Fennario."
+    },
+    {
+     "id": 5559333,
+     "season_number": 2,
+     "episode_number": 10,
+     "name": "Reconstruction",
+     "air_date": "2024-11-17",
+     "runtime": 36,
+     "still_path": "/fBGaUvBgaWaAf45898cylageRiz.jpg",
+     "overview": "Dwight et son équipe règlent les problèmes à mesure que leur empire s'étend."
+    }
+   ]
+  },
+  "season/3": {
+   "season_number": 3,
+   "name": "Saison 3",
+   "air_date": "2025-09-21",
+   "poster_path": "/rnVuFQoJodx3gqEGaU4WaZ2IK12.jpg",
+   "overview": "Dans la saison 3, à mesure que l’empire de Dwight s’étend, ses ennemis et les dangers pour son équipe se multiplient. Ce…",
+   "episodes": [
+    {
+     "id": 6057789,
+     "season_number": 3,
+     "episode_number": 1,
+     "name": "Bourbon sanglant",
+     "air_date": "2025-09-21",
+     "runtime": 48,
+     "still_path": "/kVcIMFusIwWQrVwRidDJKBDoqYX.jpg",
+     "overview": "Dwight essaie de conclure une affaire de distillerie."
+    },
+    {
+     "id": 6432115,
+     "season_number": 3,
+     "episode_number": 2,
+     "name": "La cuvée demi-siècle",
+     "air_date": "2025-09-28",
+     "runtime": 45,
+     "still_path": "/pl4h2iMdnfBcsyQZdzXyJlPttuD.jpg",
+     "overview": "Dwight affronte des menaces de Jeremiah Dunmire et de la Mafia Dixie."
+    },
+    {
+     "id": 6432116,
+     "season_number": 3,
+     "episode_number": 3,
+     "name": "Gangster et vrai gangster",
+     "air_date": "2025-10-05",
+     "runtime": 48,
+     "still_path": "/1tSPCXDWj7a98ZLqtd9ztlQloaL.jpg",
+     "overview": "Dwight doit coopérer avec l'agent Musso pour faire tomber un terroriste."
+    },
+    {
+     "id": 6432117,
+     "season_number": 3,
+     "episode_number": 4,
+     "name": "Au fond du baril",
+     "air_date": "2025-10-12",
+     "runtime": 41,
+     "still_path": "/1cF0plTuMFx0tjL9NHDOHLtvNa5.jpg",
+     "overview": "Dwight rassemble son équipe pour récupérer le bourbon volé par Dunmire."
+    },
+    {
+     "id": 6432118,
+     "season_number": 3,
+     "episode_number": 5,
+     "name": "L'inauguration",
+     "air_date": "2025-10-19",
+     "runtime": 44,
+     "still_path": "/hkQOabNWDwdHhX4ytSg6EVsLWe5.jpg",
+     "overview": "Dwight inaugure sa marque de bourbon. Dunmire gâche son inauguration."
+    },
+    {
+     "id": 6432119,
+     "season_number": 3,
+     "episode_number": 6,
+     "name": "Plein de bulles",
+     "air_date": "2025-10-26",
+     "runtime": 40,
+     "still_path": "/mkqWRARiYLT0WQL9921yWwdFyE2.jpg",
+     "overview": "Dwight lutte et fait face aux menaces de Dunmire et Quiet Ray."
+    },
+    {
+     "id": 6432120,
+     "season_number": 3,
+     "episode_number": 7,
+     "name": "L'art de la guerre",
+     "air_date": "2025-11-02",
+     "runtime": 40,
+     "still_path": "/6MjNEf7gPhsK7NeV7OfQfChP5cV.jpg",
+     "overview": "Dwight rouvre sa distillerie. Tyson, Goodie et Spencer montent une arnaque"
+    },
+    {
+     "id": 6432121,
+     "season_number": 3,
+     "episode_number": 8,
+     "name": "Rien n'est encore terminé",
+     "air_date": "2025-11-09",
+     "runtime": 41,
+     "still_path": "/1W3A4cF4Pstx8rZBI3e1rv1cCQt.jpg",
+     "overview": "Dwight découvre un plan mortel de Dunmire et tente de l'arrêter."
+    },
+    {
+     "id": 6432122,
+     "season_number": 3,
+     "episode_number": 9,
+     "name": "Poids mort",
+     "air_date": "2025-11-16",
+     "runtime": 40,
+     "still_path": "/jRgOHqIt1NEta7mEmCndxS0hYsY.jpg",
+     "overview": "Dwight étend son empire, l'activité secondaire de Tyson pose question."
+    },
+    {
+     "id": 6432123,
+     "season_number": 3,
+     "episode_number": 10,
+     "name": "Lézard Jésus",
+     "air_date": "2025-11-23",
+     "runtime": 38,
+     "still_path": "/imjg5MVfmNnmpJvJzbIh6n6A6Xz.jpg",
+     "overview": "Dwight et son équipe se préparent pour la guerre. Dernier épisode"
+    }
+   ]
+  },
+  "season/4": {
+   "season_number": 4,
+   "name": "Saison 4",
+   "air_date": "2026-10-16",
+   "poster_path": "/sl24Oi3dA7u6Eut6dV1WNEGlASV.jpg",
+   "overview": "Dwight se bat pour légitimer son empire et protéger son équipe alors que des politiciens corrompus, de nouveaux ennemis …",
+   "episodes": [
+    {
+     "id": 7499435,
+     "season_number": 4,
+     "episode_number": 1,
+     "name": "Q.Q.D.F",
+     "air_date": "2026-10-16",
+     "runtime": 44,
+     "still_path": "/vgs4jNN99YfC8O2ElCqDqD4Wyys.jpg",
+     "overview": "Dwight mène son équipe vers la légitimité en concluant des accords et en étendant son empire. Premier épisode de la sais…"
+    },
+    {
+     "id": 7499436,
+     "season_number": 4,
+     "episode_number": 2,
+     "name": "Le coq aveugle",
+     "air_date": "2026-10-23",
+     "runtime": 41,
+     "still_path": "/fARP0KCN1dygMoWepGmJLa7FkAj.jpg",
+     "overview": "Après une perte accablante, Dwight s'appuie sur Bodhi alors que son équipe doit affronter les retombées de l'affaire des…"
+    },
+    {
+     "id": 7499437,
+     "season_number": 4,
+     "episode_number": 3,
+     "name": "Mise en demeure",
+     "air_date": "2026-10-30",
+     "runtime": 44,
+     "still_path": "/5QrA5SeIsOIzDTOqbLADqymT7gz.jpg",
+     "overview": "Dwight mobilise ses troupes alors que le gouverneur Clark ferme ses entreprises, bloque les expéditions de bourbon et pr…"
+    },
+    {
+     "id": 7499438,
+     "season_number": 4,
+     "episode_number": 4,
+     "name": "Case départ",
+     "air_date": "2026-11-06",
+     "runtime": 44,
+     "still_path": "/505bDYzfILnGh9EYvlEffyqdhRt.jpg",
+     "overview": "Dwight se réorganise, Mitch et Spencer préparent un gros coup. Bodhi étend un trafic de faux billets, Tyson met à l'épre…"
+    },
+    {
+     "id": 7499439,
+     "season_number": 4,
+     "episode_number": 5,
+     "name": "Les Dinosaures",
+     "air_date": "2026-11-13",
+     "runtime": 43,
+     "still_path": "/rkaxaVOrOnw1ke66ioo3SofXOXC.jpg",
+     "overview": "Dwight a de plus en plus d'ennemis. Bodhi et Timpone se dépêchent de tirer profit de leur vin, Mitch et Spencer font une…"
+    },
+    {
+     "id": 7499440,
+     "season_number": 4,
+     "episode_number": 6,
+     "name": "Épisode 6",
+     "air_date": "2026-11-20",
+     "runtime": null,
+     "still_path": "/wiEBpxf5Y8hGgLqdRigA552cUSh.jpg",
+     "overview": ""
+    },
+    {
+     "id": 7499441,
+     "season_number": 4,
+     "episode_number": 7,
+     "name": "Épisode 7",
+     "air_date": "2026-11-27",
+     "runtime": null,
+     "still_path": null,
+     "overview": ""
+    },
+    {
+     "id": 7499442,
+     "season_number": 4,
+     "episode_number": 8,
+     "name": "Épisode 8",
+     "air_date": "2026-12-04",
+     "runtime": null,
+     "still_path": null,
+     "overview": ""
+    },
+    {
+     "id": 7499443,
+     "season_number": 4,
+     "episode_number": 9,
+     "name": "Épisode 9",
+     "air_date": "2026-12-11",
+     "runtime": null,
+     "still_path": "/w0GMYXJNqpnaPu4o5sSQ6tpdNA2.jpg",
+     "overview": ""
+    },
+    {
+     "id": 7499444,
+     "season_number": 4,
+     "episode_number": 10,
+     "name": "Épisode 10",
+     "air_date": "2026-12-18",
+     "runtime": null,
+     "still_path": "/3mH3EqrA5dct6MIRqt1SX3DYtY5.jpg",
+     "overview": ""
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,66 @@
+{
+ "url": "/tv/153312/season/4/watch/providers",
+ "body": {
+  "id": 486637,
+  "results": {
+   "FR": {
+    "link": "https://www.themoviedb.org/tv/153312-tulsa-king/watch?locale=FR",
+    "flatrate": [
+     {
+      "provider_id": 531,
+      "provider_name": "Paramount Plus",
+      "logo_path": "/pkx3klJlwW5JdtaulvDx6hDNtch.png",
+      "display_priority": 53
+     },
+     {
+      "provider_id": 582,
+      "provider_name": "Paramount+ Amazon Channel",
+      "logo_path": "/bxX0YVOCY7bI85BKRlJAAQ2EjUR.png",
+      "display_priority": 56
+     },
+     {
+      "provider_id": 1853,
+      "provider_name": "Paramount Plus Apple TV channel",
+      "logo_path": "/xu4LyKTwasTbta1Z0qWtZG48yZ3.png",
+      "display_priority": 58
+     },
+     {
+      "provider_id": 2303,
+      "provider_name": "Paramount Plus Premium",
+      "logo_path": "/4N4BMd0Mm0kHAmF7RZgL5lW3cwc.png",
+      "display_priority": 78
+     }
+    ]
+   },
+   "US": {
+    "link": "https://www.themoviedb.org/tv/153312-tulsa-king/watch?locale=US",
+    "flatrate": [
+     {
+      "provider_id": 2303,
+      "provider_name": "Paramount Plus Premium",
+      "logo_path": "/4N4BMd0Mm0kHAmF7RZgL5lW3cwc.png",
+      "display_priority": 18
+     },
+     {
+      "provider_id": 2616,
+      "provider_name": "Paramount Plus Essential",
+      "logo_path": "/uPWQPyF4nqwtfPNmGcFcenU57HG.png",
+      "display_priority": 19
+     },
+     {
+      "provider_id": 1853,
+      "provider_name": "Paramount Plus Apple TV channel",
+      "logo_path": "/xu4LyKTwasTbta1Z0qWtZG48yZ3.png",
+      "display_priority": 27
+     },
+     {
+      "provider_id": 582,
+      "provider_name": "Paramount+ Amazon Channel",
+      "logo_path": "/bxX0YVOCY7bI85BKRlJAAQ2EjUR.png",
+      "display_priority": 30
+     }
+    ]
+   }
+  }
+ }
+}

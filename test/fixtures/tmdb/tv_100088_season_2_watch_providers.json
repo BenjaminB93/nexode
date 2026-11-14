@@ -1,0 +1,100 @@
+{
+ "url": "/tv/100088/season/2/watch/providers",
+ "body": {
+  "id": 405376,
+  "results": {
+   "FR": {
+    "link": "https://www.themoviedb.org/tv/100088-the-last-of-us/watch?locale=FR",
+    "flatrate": [
+     {
+      "provider_id": 1899,
+      "provider_name": "HBO Max",
+      "logo_path": "/skypuy7SXuugIQeYg0IglmzoKaS.png",
+      "display_priority": 73
+     },
+     {
+      "provider_id": 1825,
+      "provider_name": "HBO Max Amazon Channel",
+      "logo_path": "/64fLWeSyZ1KQZhIdvTdy4QHeWty.png",
+      "display_priority": 103
+     }
+    ],
+    "buy": [
+     {
+      "provider_id": 2,
+      "provider_name": "Apple TV Store",
+      "logo_path": "/qdEGArH3lKfFnAtYXMkSYk5wxuG.png",
+      "display_priority": 7
+     },
+     {
+      "provider_id": 10,
+      "provider_name": "Amazon Video",
+      "logo_path": "/jn6TLbtaTZntTRX9UYucHJvpQx1.png",
+      "display_priority": 37
+     },
+     {
+      "provider_id": 2286,
+      "provider_name": "VIVA by videofutur",
+      "logo_path": "/uzTONLCUH92RRMSzs206OYtWVml.png",
+      "display_priority": 77
+     },
+     {
+      "provider_id": 2307,
+      "provider_name": "Premiere Max",
+      "logo_path": "/yERf5EH3GjWMB0ZSWPaov1kCKrR.png",
+      "display_priority": 79
+     }
+    ]
+   },
+   "US": {
+    "link": "https://www.themoviedb.org/tv/100088-the-last-of-us/watch?locale=US",
+    "flatrate": [
+     {
+      "provider_id": 1825,
+      "provider_name": "HBO Max Amazon Channel",
+      "logo_path": "/64fLWeSyZ1KQZhIdvTdy4QHeWty.png",
+      "display_priority": 14
+     },
+     {
+      "provider_id": 486,
+      "provider_name": "Spectrum On Demand",
+      "logo_path": "/6qPtM96UZkt3Bu4ZFPsDeHFWUZ2.png",
+      "display_priority": 123
+     },
+     {
+      "provider_id": 1899,
+      "provider_name": "HBO Max",
+      "logo_path": "/skypuy7SXuugIQeYg0IglmzoKaS.png",
+      "display_priority": 154
+     }
+    ],
+    "buy": [
+     {
+      "provider_id": 10,
+      "provider_name": "Amazon Video",
+      "logo_path": "/jn6TLbtaTZntTRX9UYucHJvpQx1.png",
+      "display_priority": 10
+     },
+     {
+      "provider_id": 2,
+      "provider_name": "Apple TV Store",
+      "logo_path": "/qdEGArH3lKfFnAtYXMkSYk5wxuG.png",
+      "display_priority": 11
+     },
+     {
+      "provider_id": 3,
+      "provider_name": "Google Play Movies",
+      "logo_path": "/aZRENwYILujqs0RVOZutTh0BVGV.png",
+      "display_priority": 24
+     },
+     {
+      "provider_id": 7,
+      "provider_name": "Fandango At Home",
+      "logo_path": "/wpOt6x0dRxTrIzuBosto4LGd7E9.png",
+      "display_priority": 41
+     }
+    ]
+   }
+  }
+ }
+}

@@ -51,9 +51,11 @@ CREATE TABLE episodes (
   air_date    TEXT,                                         -- NULL = date inconnue
   runtime     INTEGER,
   still_path  TEXT,
-  UNIQUE (show_id, season, number),
+  removed_at  TEXT,                                         -- non NULL = disparu chez TMDB, gardé parce que quelqu'un l'a vu
   FOREIGN KEY (show_id, season) REFERENCES seasons(show_id, number) ON DELETE CASCADE
 );
+-- Une position (série, saison, numéro) n'a qu'un épisode actuel ; les épisodes retirés gardent leur numéro.
+CREATE UNIQUE INDEX episodes_position ON episodes(show_id, season, number) WHERE removed_at IS NULL;
 CREATE INDEX episodes_air_date ON episodes(air_date);
 
 -- Où regarder (JustWatch via TMDB), par saison et par pays. provider_fetches garde la date de relevé même quand la liste est vide.

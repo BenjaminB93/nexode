@@ -1,0 +1,48 @@
+{
+ "url": "/tv/153312?append_to_response=external_ids&language=fr-FR",
+ "body": {
+  "id": 153312,
+  "name": "Tulsa King",
+  "original_name": "Tulsa King",
+  "original_language": "en",
+  "first_air_date": "2022-11-13",
+  "status": "Returning Series",
+  "poster_path": "/oyovexqrZRbafJNlNb5Sxgp9exQ.jpg",
+  "overview": "Dwight Manfredi, surnommé « Le Général », vient de sortir de prison où il a passé 25 ans. Cet ancien membre de la mafia …",
+  "seasons": [
+   {
+    "season_number": 0,
+    "name": "Épisodes spéciaux",
+    "episode_count": 1,
+    "air_date": "2022-11-11"
+   },
+   {
+    "season_number": 1,
+    "name": "Saison 1",
+    "episode_count": 9,
+    "air_date": "2022-11-13"
+   },
+   {
+    "season_number": 2,
+    "name": "Saison 2",
+    "episode_count": 10,
+    "air_date": "2024-09-15"
+   },
+   {
+    "season_number": 3,
+    "name": "Saison 3",
+    "episode_count": 10,
+    "air_date": "2025-09-21"
+   },
+   {
+    "season_number": 4,
+    "name": "Saison 4",
+    "episode_count": 10,
+    "air_date": "2026-10-16"
+   }
+  ],
+  "external_ids": {
+   "tvdb_id": 413215
+  }
+ }
+}

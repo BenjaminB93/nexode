@@ -1,0 +1,30 @@
+{
+ "url": "/tv/100088?append_to_response=external_ids&language=fr-FR",
+ "body": {
+  "id": 100088,
+  "name": "The Last of Us",
+  "original_name": "The Last of Us",
+  "original_language": "en",
+  "first_air_date": "2023-01-15",
+  "status": "Returning Series",
+  "poster_path": "/4pMd9VAdqm96KA2W4X8yetgc7EF.jpg",
+  "overview": "Vingt ans après la destruction de la civilisation moderne, Joel, un survivant endurci, est engagé pour faire sortir Elli…",
+  "seasons": [
+   {
+    "season_number": 1,
+    "name": "Saison 1",
+    "episode_count": 9,
+    "air_date": "2023-01-15"
+   },
+   {
+    "season_number": 2,
+    "name": "Saison 2",
+    "episode_count": 7,
+    "air_date": "2025-04-13"
+   }
+  ],
+  "external_ids": {
+   "tvdb_id": 392256
+  }
+ }
+}

@@ -1,0 +1,154 @@
+{
+ "url": "/tv/153312?append_to_response=season/4&language=en",
+ "body": {
+  "id": 153312,
+  "name": "Tulsa King",
+  "original_name": "Tulsa King",
+  "original_language": "en",
+  "first_air_date": "2022-11-13",
+  "status": "Returning Series",
+  "poster_path": "/y13WOeZ2rz2Ezpws0RJ0I8sQpG4.jpg",
+  "overview": "New York mafia capo Dwight \"The General\" Manfredi is released from prison after 25 years and exiled by his boss to set u…",
+  "seasons": [
+   {
+    "season_number": 0,
+    "name": "Specials",
+    "episode_count": 1,
+    "air_date": "2022-11-11"
+   },
+   {
+    "season_number": 1,
+    "name": "Season 1",
+    "episode_count": 9,
+    "air_date": "2022-11-13"
+   },
+   {
+    "season_number": 2,
+    "name": "Season 2",
+    "episode_count": 10,
+    "air_date": "2024-09-15"
+   },
+   {
+    "season_number": 3,
+    "name": "Season 3",
+    "episode_count": 10,
+    "air_date": "2025-09-21"
+   },
+   {
+    "season_number": 4,
+    "name": "Season 4",
+    "episode_count": 10,
+    "air_date": "2026-10-16"
+   }
+  ],
+  "season/4": {
+   "season_number": 4,
+   "name": "Season 4",
+   "air_date": "2026-10-16",
+   "poster_path": "/aqvDey0veLcY7XkoDWGFOqRAD3I.jpg",
+   "overview": "In season four, Dwight fights to legitimize his empire and protect his crew as corrupt politicians, dangerous new enemie…",
+   "episodes": [
+    {
+     "id": 7499435,
+     "season_number": 4,
+     "episode_number": 1,
+     "name": "W.W.D.D.",
+     "air_date": "2026-10-16",
+     "runtime": 44,
+     "still_path": "/vgs4jNN99YfC8O2ElCqDqD4Wyys.jpg",
+     "overview": "Dwight leads his crew toward expanding their empire. Season premiere."
+    },
+    {
+     "id": 7499436,
+     "season_number": 4,
+     "episode_number": 2,
+     "name": "Blind Rooster",
+     "air_date": "2026-10-23",
+     "runtime": 41,
+     "still_path": "/fARP0KCN1dygMoWepGmJLa7FkAj.jpg",
+     "overview": "Reeling from a crushing personal loss, Dwight leans on Bodhi's unexpected honesty as his crew faces fallout from Tyson's…"
+    },
+    {
+     "id": 7499437,
+     "season_number": 4,
+     "episode_number": 3,
+     "name": "Cease & Desist",
+     "air_date": "2026-10-30",
+     "runtime": 44,
+     "still_path": "/5QrA5SeIsOIzDTOqbLADqymT7gz.jpg",
+     "overview": "Dwight rallies the troops to fight back as Governor Clark shuts down his businesses, freezes bourbon shipments, and targ…"
+    },
+    {
+     "id": 7499438,
+     "season_number": 4,
+     "episode_number": 4,
+     "name": "Square One",
+     "air_date": "2026-11-06",
+     "runtime": 44,
+     "still_path": "/505bDYzfILnGh9EYvlEffyqdhRt.jpg",
+     "overview": "Dwight regroups as Mitch and Spencer prep for a high stakes score. Bodhi expands a counterfeit scheme, and Tyson tests h…"
+    },
+    {
+     "id": 7499439,
+     "season_number": 4,
+     "episode_number": 5,
+     "name": "Dinosaurs",
+     "air_date": "2026-11-13",
+     "runtime": 43,
+     "still_path": "/rkaxaVOrOnw1ke66ioo3SofXOXC.jpg",
+     "overview": "Dwight sees his enemies multiplying. Bodhi and Timpone race to profit from their wine as Mitch and Spencer make a discov…"
+    },
+    {
+     "id": 7499440,
+     "season_number": 4,
+     "episode_number": 6,
+     "name": "Racket Club",
+     "air_date": "2026-11-20",
+     "runtime": null,
+     "still_path": "/wiEBpxf5Y8hGgLqdRigA552cUSh.jpg",
+     "overview": "Dwight battles Turco's rising demands while racing to protect the ranch from Van Heusen's land grab. Tyson gets a life c…"
+    },
+    {
+     "id": 7499441,
+     "season_number": 4,
+     "episode_number": 7,
+     "name": "Black Diamonds",
+     "air_date": "2026-11-27",
+     "runtime": null,
+     "still_path": null,
+     "overview": "Dwight expands his operation while seeking stronger backing abroad. Mitch and Spencer look to score big at the track."
+    },
+    {
+     "id": 7499442,
+     "season_number": 4,
+     "episode_number": 8,
+     "name": "Storm Front",
+     "air_date": "2026-12-04",
+     "runtime": null,
+     "still_path": null,
+     "overview": ""
+    },
+    {
+     "id": 7499443,
+     "season_number": 4,
+     "episode_number": 9,
+     "name": "Nerved Up",
+     "air_date": "2026-12-11",
+     "runtime": null,
+     "still_path": "/w0GMYXJNqpnaPu4o5sSQ6tpdNA2.jpg",
+     "overview": "Dwight corners Governor Clark before heading to New York to confront Quiet Ray. Meanwhile, Bevilaqua feeds both sides, t…"
+    },
+    {
+     "id": 7499444,
+     "season_number": 4,
+     "episode_number": 10,
+     "name": "Exit Interview",
+     "air_date": "2026-12-18",
+     "runtime": null,
+     "still_path": "/3mH3EqrA5dct6MIRqt1SX3DYtY5.jpg",
+     "overview": "Dwight's empire is on the brink - but a brutal double-cross shifts the balance of power, forcing him towards a dangerous…"
+    }
+   ]
+  }
+ }
+}
