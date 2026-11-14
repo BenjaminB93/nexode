@@ -33,7 +33,7 @@ export function viewAbout(app, st) {
         </section>
         <section style="display: flex; flex-direction: column; gap: 8px">
           <h2 class="eyebrow">Logiciel libre</h2>
-          <p style=${p}>Nexode est distribué sous licence GNU AGPL : tu peux l’utiliser, l’étudier, le modifier et le redistribuer.
+          <p style=${p}>Nexode est distribué sous licence GNU AGPL : il peut être utilisé, étudié, modifié et redistribué librement.
             Toute version modifiée mise en ligne doit publier son code source.</p>
           ${info && info.source ? extLink(info.source, 'Code source') : null}
           ${extLink('https://www.gnu.org/licenses/agpl-3.0.html', 'Texte de la licence')}

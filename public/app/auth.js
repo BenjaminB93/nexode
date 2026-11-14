@@ -58,7 +58,7 @@ function waitText(seconds) {
 export function authErrorText(e) {
   switch (e && e.code) {
     case 'invalid_credentials': return 'Nom d’utilisateur ou mot de passe incorrect';
-    case 'too_many_attempts': return 'Trop de tentatives : réessaie dans ' + waitText(e.retryAfter);
+    case 'too_many_attempts': return 'Trop de tentatives : réessayer dans ' + waitText(e.retryAfter);
     case 'username_taken': return 'Ce nom est déjà pris';
     case 'invalid_input':
       if (e.field === 'username') return NAME_RULE;

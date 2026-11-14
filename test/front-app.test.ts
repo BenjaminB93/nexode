@@ -245,7 +245,7 @@ test('Nom d’utilisateur : 3 à 24 lettres (accents compris), chiffres, _ - . ;
 });
 
 test('Messages d’erreur des formulaires de compte', () => {
-  assert.equal(A.authErrorText(new ApiError(429, 'too_many_attempts', undefined, 61)), 'Trop de tentatives : réessaie dans 2 min');
+  assert.equal(A.authErrorText(new ApiError(429, 'too_many_attempts', undefined, 61)), 'Trop de tentatives : réessayer dans 2 min');
   assert.equal(A.authErrorText(new ApiError(401, 'invalid_credentials')), 'Nom d’utilisateur ou mot de passe incorrect');
   assert.equal(A.authErrorText(new ApiError(403, 'wrong_password')), 'Mot de passe incorrect');
   assert.equal(A.authErrorField(new ApiError(409, 'username_taken')), 'name');

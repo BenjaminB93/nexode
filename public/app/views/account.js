@@ -129,9 +129,9 @@ export function exportSheetView(app, x) {
 export function deleteSelfSheet(app, d) {
   const ok = !!d.pw;
   return html`<div class="overlay backdrop-in">
-    <div role="dialog" class="sheetbox sheet-in" aria-modal="true" aria-label="Supprimer ton compte ?" style="padding: 22px 16px calc(24px + var(--safe-bottom)); gap: 10px">
-      <h2 class="sheet-title">Supprimer ton compte ?</h2>
-      <p style="margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: var(--soft)">Ton historique de visionnage, tes séries suivies et tes liens d’invitation seront effacés définitivement.</p>
+    <div role="dialog" class="sheetbox sheet-in" aria-modal="true" aria-label="Supprimer mon compte ?" style="padding: 22px 16px calc(24px + var(--safe-bottom)); gap: 10px">
+      <h2 class="sheet-title">Supprimer mon compte ?</h2>
+      <p style="margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: var(--soft)">L’historique de visionnage, les séries suivies et les liens d’invitation seront effacés définitivement.</p>
       <form style="display: flex; flex-direction: column; gap: 10px" onSubmit=${(/** @type {Event} */ ev) => { ev.preventDefault(); if (ok && !d.busy) app.confirmDeleteSelf(); }}>
         ${passwordField({ id: 'mdp-suppr', label: 'Mot de passe', value: d.pw, shown: d.show, autocomplete: 'current-password', invalid: d.bad === 'password',
           onInput: (v) => app.setDelSelf({ pw: v, error: null, bad: null }), onToggle: () => app.setDelSelf({ show: !d.show }) })}

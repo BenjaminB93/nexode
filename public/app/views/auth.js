@@ -34,7 +34,7 @@ export function viewAuth(app, st) {
     label = 'Se connecter';
     error = null;
   } else if (a.screen === 'signup') {
-    title = 'Créer ton compte';
+    title = 'Créer un compte';
     sub = linkSub(a.info && a.info.invitedBy ? 'Invitation de ' + a.info.invitedBy : null);
     body = html`${nameField(!!nameProblem(name))}${pw('Mot de passe', 'new-password')}${pwHint}`;
     ok = nameOk(name) && passwordOk(f.pw);
@@ -51,7 +51,7 @@ export function viewAuth(app, st) {
   } else {
     title = 'Connexion';
     body = html`${nameField()}${pw('Mot de passe', 'current-password')}
-      <span style="font-size: 12px; line-height: 1.5; color: var(--faint)">Mot de passe oublié : l’administrateur peut t’envoyer un lien de réinitialisation.</span>`;
+      <span style="font-size: 12px; line-height: 1.5; color: var(--faint)">Mot de passe oublié : demander un lien de réinitialisation à l’administrateur.</span>`;
     ok = !!name && !!f.pw;
     label = 'Se connecter';
   }

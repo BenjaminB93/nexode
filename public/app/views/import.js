@@ -54,7 +54,7 @@ function matchCard(app, x, m) {
   const cands = [...m.candidates, ...(x.extra[m.key] || []).filter((/** @type {any} */ c) => !m.candidates.some((/** @type {any} */ k) => k.id === c.id))];
   const searching = x.searchFor === m.key;
   const candSub = (/** @type {any} */ c) => [c.year, c.seasonCount ? plural(c.seasonCount, 'saison', 'saisons') : null,
-    m.episodes && c.hits !== undefined ? c.hits + '/' + m.episodes + ' de tes épisodes' : null].filter(Boolean).join(' · ');
+    m.episodes && c.hits !== undefined ? c.hits + '/' + m.episodes + ' épisodes vus retrouvés' : null].filter(Boolean).join(' · ');
   return html`<section class="group" style="padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
     <span style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px 6px">
       <span style="font-size: 15px; font-weight: 700">${exportLabel(m)}</span>
@@ -93,7 +93,7 @@ export function viewImport(app, x) {
       <section class="group" style="padding: 14px; display: flex; flex-direction: column; gap: 6px">
         <span style="font-size: 17px; font-weight: 700">${plural(episodes.imported, 'épisode importé', 'épisodes importés')}</span>
         ${muted((episodes.alreadySeen ? plural(episodes.alreadySeen, 'déjà vu', 'déjà vus') + ' · ' : '') + plural(shows.imported, 'série', 'séries')
-          + ' · ' + plural(relations.followed, 'suivie', 'suivies') + ', ' + relations.shelved + ' de côté' + (relations.kept ? ', ' + relations.kept + ' déjà dans tes séries' : ''))}
+          + ' · ' + plural(relations.followed, 'suivie', 'suivies') + ', ' + relations.shelved + ' de côté' + (relations.kept ? ', ' + relations.kept + ' déjà dans Mes séries' : ''))}
       </section>
       ${list('Séries non importées', shows.skipped)}
       ${list('Épisodes non retrouvés', missingByShow(episodes.missing))}

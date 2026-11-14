@@ -56,5 +56,5 @@ console.log(`épisodes : ${episodes.imported} importés, ${episodes.alreadySeen}
 const bySeries = new Map<string, string[]>();
 for (const e of episodes.missing) bySeries.set(e.show, [...(bySeries.get(e.show) ?? []), `S${e.season}E${e.number}`]);
 for (const [show, eps] of bySeries) console.log(`  - ${show} : ${eps.length > 8 ? `${eps.slice(0, 8).join(', ')}… (${eps.length})` : eps.join(', ')}`);
-console.log(`suivi : ${relations.followed} suivies, ${relations.shelved} de côté, ${relations.kept} déjà dans tes séries (inchangées)`);
+console.log(`suivi : ${relations.followed} suivies, ${relations.shelved} de côté, ${relations.kept} déjà dans Mes séries (inchangées)`);
 console.log(`appels HTTP TMDB : ${tmdb.calls()}`);

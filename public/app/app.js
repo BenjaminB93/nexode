@@ -905,7 +905,7 @@ export class App extends Component {
         P.markAsked();
         this.setState({ confirm: {
           title: 'Notifications',
-          text: 'Être prévenu quand un nouvel épisode d’une de tes séries sort ?',
+          text: 'Être prévenu à la sortie d’un nouvel épisode d’une série suivie ?',
           ok: 'Oui', cancel: 'Non',
           action: () => { this.setPush(true); this.setState({ confirm: null }); },
         } });
@@ -913,7 +913,7 @@ export class App extends Component {
         P.markAsked();
         this.setState({ confirm: {
           title: 'Notifications',
-          text: 'Pour être prévenu à chaque nouvel épisode, ajoute l’appli à l’écran d’accueil : bouton Partager, puis « Sur l’écran d’accueil ».',
+          text: 'Pour être prévenu des nouveaux épisodes, ajouter l’appli à l’écran d’accueil : bouton Partager, puis « Sur l’écran d’accueil ».',
           ok: 'OK', cancel: null,
           action: () => this.setState({ confirm: null }),
         } });
@@ -948,7 +948,7 @@ export class App extends Component {
       if (r === 'sent') this.toast('Notification envoyée');
       else if (r === 'gone') {
         this.setState({ push: 'off' });
-        this.toast('Cet appareil n’est plus abonné : réactive les notifications');
+        this.toast('Cet appareil n’est plus abonné : réactiver les notifications');
       } else this.toast('Le service de notifications a refusé l’envoi');
     }, (e) => { if (epoch === this.epoch) this.failToast(e, 'Envoi impossible'); });
   }

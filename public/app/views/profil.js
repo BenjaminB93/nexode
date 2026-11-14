@@ -10,7 +10,7 @@ import { header, loadError, phLine, roleChip, segmented } from '../components.js
 /** Mention sous « Notifications » quand l'appareil ne peut pas les activer. @type {Record<string, string>} */
 const PUSH_NOTES = {
   denied: 'Bloquées dans les réglages du navigateur',
-  install: 'Pour les recevoir, ajoute l’appli à l’écran d’accueil (Partager › Sur l’écran d’accueil)',
+  install: 'Pour les recevoir, ajouter l’appli à l’écran d’accueil (Partager › Sur l’écran d’accueil)',
   unsupported: 'Ce navigateur ne les reçoit pas',
   unavailable: 'Pas encore configurées sur le serveur',
 };
