@@ -23,19 +23,29 @@ function missingByShow(missing) {
   return [...by].map(([show, eps]) => show + ' : ' + (eps.length > 6 ? eps.slice(0, 6).join(', ') + '… (' + eps.length + ')' : eps.join(', ')));
 }
 
-/** Ligne à cocher (un seul choix par série). @param {boolean} on @param {any} lead @param {string} title @param {string} sub @param {() => void} onPick */
-function choiceRow(on, lead, title, sub, onPick) {
-  return html`<button type="button" role="radio" aria-checked=${on ? 'true' : 'false'} class="press" onClick=${onPick}
-    style="min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 6px 4px; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">
-    ${lead}
-    <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
-      <span class="ell" style="font-size: 14px; font-weight: 600">${title}</span>
-      <span class="ell" style="font-size: 12px; color: var(--muted)">${sub}</span>
-    </span>
-    <span aria-hidden="true" style="flex: none; width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; border: 2px solid ${on ? 'var(--accent)' : 'var(--line-strong)'}; display: flex; align-items: center; justify-content: center">
-      <span style="width: 10px; height: 10px; border-radius: 5px; background: var(--accent); transform: scale(${on ? 1 : 0}); transition: transform 0.15s ease"></span>
-    </span>
-  </button>`;
+/**
+ * Ligne de choix (un seul par série) : la ligne ouvre la fiche (onOpen), la pastille à droite choisit.
+ * Sans onOpen, toute la ligne choisit.
+ * @param {boolean} on @param {any} lead @param {string} title @param {string} sub @param {() => void} onPick @param {(() => void) | null} onOpen
+ */
+function choiceRow(on, lead, title, sub, onPick, onOpen) {
+  const dot = html`<span aria-hidden="true" style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; border: 2px solid ${on ? 'var(--accent)' : 'var(--line-strong)'}; display: flex; align-items: center; justify-content: center">
+    <span style="width: 10px; height: 10px; border-radius: 5px; background: var(--accent); transform: scale(${on ? 1 : 0}); transition: transform 0.15s ease"></span>
+  </span>`;
+  const plain = 'border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer';
+  return html`<div style="min-height: 60px; display: flex; align-items: center">
+    <button type="button" class="press" onClick=${onOpen || onPick} role=${onOpen ? undefined : 'radio'} aria-checked=${onOpen ? undefined : on ? 'true' : 'false'}
+      style="flex: 1; min-width: 0; min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 6px 4px; text-align: left; ${plain}">
+      ${lead}
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+        <span class="ell" style="font-size: 14px; font-weight: 600">${title}</span>
+        <span class="ell" style="font-size: 12px; color: var(--muted)">${sub}</span>
+      </span>
+      ${onOpen ? null : html`<span style="flex: none; width: 44px; display: flex; justify-content: center">${dot}</span>`}
+    </button>
+    ${onOpen ? html`<button type="button" role="radio" aria-checked=${on ? 'true' : 'false'} aria-label=${'Choisir ' + title} class="press" onClick=${onPick}
+      style="flex: none; width: 44px; height: 60px; display: flex; align-items: center; justify-content: center; padding: 0; ${plain}">${dot}</button>` : null}
+  </div>`;
 }
 
 /** Une série à confirmer. @param {import('../app.js').App} app @param {import('../app.js').ImportState} x @param {any} m */
@@ -51,9 +61,9 @@ function matchCard(app, x, m) {
       <span style="font-size: 12px; color: var(--muted)">${KIND[m.kind]}${m.episodes ? ' · ' + plural(m.episodes, 'épisode vu', 'épisodes vus') : ''}</span>
     </span>
     <div role="radiogroup" aria-label=${exportLabel(m)}>
-      ${cands.map((/** @type {any} */ c) => choiceRow(cur === c.id, poster(c.posterPath, 34, 51, 5, 'flex: none'), c.name, candSub(c), () => app.chooseImport(m.key, c.id)))}
+      ${cands.map((/** @type {any} */ c) => choiceRow(cur === c.id, poster(c.posterPath, 34, 51, 5, 'flex: none'), c.name, candSub(c), () => app.chooseImport(m.key, c.id), () => app.openShow(c)))}
       ${choiceRow(cur === null, html`<span style="flex: none; width: 34px; height: 51px; display: flex; align-items: center; justify-content: center; color: var(--dim)">—</span>`,
-        'Ne pas importer', '', () => app.chooseImport(m.key, null))}
+        'Ne pas importer', '', () => app.chooseImport(m.key, null), null)}
     </div>
     ${searching ? html`<div style="display: flex; flex-direction: column; gap: 6px; padding-top: 6px">
       <label style="height: 44px; box-sizing: border-box; border-radius: 12px; background: var(--card); border: 1px solid var(--accent); display: flex; align-items: center; gap: 10px; padding: 0 12px">
@@ -63,7 +73,7 @@ function matchCard(app, x, m) {
           onInput=${(/** @type {Event} */ ev) => app.searchImport(/** @type {HTMLInputElement} */ (ev.currentTarget).value)}
           style="flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--fg); font: 500 16px var(--text)" />
       </label>
-      ${(x.searchResults || []).map((/** @type {any} */ r) => choiceRow(false, poster(r.posterPath, 34, 51, 5, 'flex: none'), r.name, r.year ? String(r.year) : '', () => app.pickImportSearch(m.key, r)))}
+      ${(x.searchResults || []).map((/** @type {any} */ r) => choiceRow(false, poster(r.posterPath, 34, 51, 5, 'flex: none'), r.name, r.year ? String(r.year) : '', () => app.pickImportSearch(m.key, r), () => app.openShow(r)))}
     </div>` : html`<button type="button" class="press" onClick=${() => app.openImportSearch(m.key, m.title)}
       style="align-self: flex-start; height: 40px; border: 0; background: transparent; color: var(--accent); font: 600 13px var(--text); padding: 0 4px; cursor: pointer">Chercher une autre série</button>`}
   </section>`;
