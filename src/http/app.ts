@@ -1,5 +1,6 @@
 import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
+import { etag } from 'hono/etag';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { serveStatic } from '@hono/node-server/serve-static';
@@ -118,7 +119,12 @@ export function createApp(deps: AppDeps): Hono {
       return c.html(await readFile(join(PUBLIC_DIR, 'index.html'), 'utf8'));
     });
   }
-  app.use('/*', serveStatic({ root: PUBLIC_DIR }));
+  // Fichiers statiques revalidés à chaque chargement (304 via ETag si inchangés) : sans Cache-Control, le navigateur
+  // garde les modules JS selon sa propre heuristique et une mise à jour reste invisible après actualisation.
+  app.use('/*', etag(), async (c, next) => {
+    await next();
+    if (c.res.ok) c.header('Cache-Control', 'no-cache');
+  }, serveStatic({ root: PUBLIC_DIR }));
 
   app.onError((thrown, c) => {
     // File de calculs scrypt pleine : même réponse qu'une limitation, à retenter tout de suite.

@@ -781,6 +781,18 @@ test('pages /invitation/:code et /reinitialisation/:token : index.html, sans Ref
   }
 });
 
+test('fichiers statiques : revalidés à chaque chargement, 304 si inchangés', async () => {
+  const s = setup();
+  const res = await s.app.request('/app/style.css');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('cache-control'), 'no-cache');
+  const tag = res.headers.get('etag');
+  assert.ok(tag);
+  const again = await s.app.request('/app/style.css', { headers: { 'if-none-match': tag } });
+  assert.equal(again.status, 304);
+  assert.equal(again.headers.get('cache-control'), 'no-cache');
+});
+
 test('scrypt : paramètres dans la chaîne, sel aléatoire, \'!\' jamais valide', async () => {
   assert.match(PW_HASH, /^scrypt\$16384\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
   assert.notEqual(await hashPassword(PW), PW_HASH);
