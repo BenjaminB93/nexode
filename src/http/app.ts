@@ -91,7 +91,7 @@ export function createApp(deps: AppDeps): Hono {
   const tooLarge = (c: Context) => c.json({ error: 'payload_too_large' }, 413);
   const smallBody = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: tooLarge });
   const importBody = bodyLimit({ maxSize: MAX_IMPORT_BYTES, onError: tooLarge });
-  api.use('*', (c, next) => (c.req.path === '/api/import' ? importBody : smallBody)(c, next));
+  api.use('*', (c, next) => (c.req.path.startsWith('/api/import') ? importBody : smallBody)(c, next));
   api.get('/health', (c) => {
     deps.db.prepare('SELECT 1').get();
     return c.json({ ok: true });

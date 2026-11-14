@@ -18,7 +18,7 @@ import { viewSeason } from './views/season.js';
 import { viewEpisode } from './views/episode.js';
 import { viewAuth } from './views/auth.js';
 import { accountSheet, deleteSelfSheet, exportSheetView, linkSheetView, viewAdmin, viewInvites } from './views/account.js';
-import { importSheetView } from './views/import.js';
+import { viewImport } from './views/import.js';
 
 /** Glissement à dépasser pour valider un swipe (px). */
 export const THRESHOLD = 110;
@@ -38,7 +38,7 @@ function loadTheme() {
 }
 
 /** Vue empilée : explorateur (show = id de série) ou écran de compte ouvert depuis Profil (show = 0).
- * @typedef {{ type: 'show' | 'season' | 'episode' | 'invites' | 'admin', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
+ * @typedef {{ type: 'show' | 'season' | 'episode' | 'invites' | 'admin' | 'import', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
 
 /** @param {View} v */
 const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v.ep ?? '');
@@ -62,8 +62,12 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null, wait?: boolean }} Form
  * Feuille « Supprimer mon compte » ; bad : champ refusé par le serveur (seul le mot de passe peut l'être).
  * @typedef {Omit<Form, 'name'>} DelSelf
- * Feuille d'import : fichiers lus, bilan de l'essai à blanc (result), étape en cours.
- * @typedef {{ files: { name: string, text: string }[] | null, step: 'pick' | 'reading' | 'analyzing' | 'preview' | 'importing', result: any, error: string | null }} ImportSheet
+ * Page d'import : fichiers lus, séries proposées (analysis), choix de l'utilisateur, recherche d'une autre série, résultat.
+ * @typedef {{
+ *   files: { name: string, text: string }[] | null, step: 'pick' | 'reading' | 'analyzing' | 'review' | 'importing' | 'done',
+ *   analysis: any, choices: Record<string, number | null>, extra: Record<string, any[]>, showSure: boolean,
+ *   searchFor: string | null, searchQ: string, searchResults: any[] | null, report: any, error: string | null,
+ * }} ImportState
  */
 
 /**
@@ -77,7 +81,7 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  *   invites: any[] | null, users: any[] | null, creatingInvite: boolean, resetBusy: boolean,
  *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
  *   account: number | null, exportSheet: { data: any } | null,
- *   delSelf: DelSelf | null, importSheet: ImportSheet | null,
+ *   delSelf: DelSelf | null, imp: ImportState,
  * }} State
  */
 
@@ -92,6 +96,9 @@ function importErrorText(e) {
   if (e && e.code === 'network') return 'Serveur injoignable';
   return 'Import impossible';
 }
+
+/** @returns {ImportState} */
+const emptyImport = () => ({ files: null, step: 'pick', analysis: null, choices: {}, extra: {}, showSure: false, searchFor: null, searchQ: '', searchResults: null, report: null, error: null });
 
 /** @returns {Form} */
 const emptyForm = () => ({ name: '', pw: '', show: false, busy: false, error: null, bad: null });
@@ -108,7 +115,7 @@ function initialState(theme) {
     errs: {},
     auth: null, form: emptyForm(),
     invites: null, users: null, creatingInvite: false, resetBusy: false,
-    linkSheet: null, account: null, exportSheet: null, delSelf: null, importSheet: null,
+    linkSheet: null, account: null, exportSheet: null, delSelf: null, imp: emptyImport(),
   };
 }
 
@@ -168,6 +175,7 @@ export class App extends Component {
     // Une action depuis l'entrée dans l'onglet : les données rechargées ne réordonnent plus la liste.
     this.touched = false;
     this.searchSeq = 0;
+    this.importSearchSeq = 0;
     /** @type {AbortController | null} */
     this.searchCtl = null;
     /** @type {Map<string, Promise<boolean>>} chargements en cours (fiche, saison), pour ne pas les dupliquer */
@@ -391,6 +399,7 @@ export class App extends Component {
     if (key === this.ensuredKey) return;
     this.ensuredKey = key;
     if (!top) return;
+    if (top.type === 'import') return;
     if (top.type === 'invites') this.loadInvites();
     else if (top.type === 'admin') this.loadUsers();
     else if (top.type === 'show') this.loadShow(top.show);
@@ -889,33 +898,72 @@ export class App extends Component {
   }
 
   // ---------- import d'historique ----------
-  openImport() { if (!this.state.importSheet) this.setState({ importSheet: { files: null, step: 'pick', result: null, error: null } }); }
-  /** @param {Partial<ImportSheet>} patch @param {number} epoch */
-  setImport(patch, epoch) {
-    if (epoch !== this.epoch) return;
-    this.setState((/** @type {State} */ s) => (s.importSheet ? { importSheet: { ...s.importSheet, ...patch } } : null));
+  openImport() {
+    if (this.state.imp.step === 'done') this.setState({ imp: emptyImport() });
+    this.push({ type: 'import', show: 0 });
   }
-  /** Fichiers choisis : lus en texte, puis analysés tout de suite (essai à blanc côté serveur). @param {FileList} list */
+  /** @param {Partial<ImportState>} patch */
+  setImportState(patch) { this.setState((/** @type {State} */ s) => ({ imp: { ...s.imp, ...patch } })); }
+  /** @param {FileList} list */
   pickImportFiles(list) {
     const epoch = this.epoch;
-    this.setImport({ step: 'reading', result: null, error: null }, epoch);
+    this.setImportState({ step: 'reading', error: null });
     Promise.all([...list].map((f) => f.text().then((text) => ({ name: f.name, text })))).then((files) => {
-      this.setImport({ files, step: 'analyzing' }, epoch);
-      return api.importHistory(files, true).then((result) => this.setImport({ step: 'preview', result }, epoch));
-    }).catch((e) => this.setImport({ step: 'pick', error: importErrorText(e) }, epoch));
+      if (epoch === this.epoch) this.setImportState({ files, step: 'pick' });
+    }, () => { if (epoch === this.epoch) this.setImportState({ step: 'pick', error: 'Lecture des fichiers impossible' }); });
+  }
+  analyzeImport() {
+    const x = this.state.imp;
+    if (!x.files || x.step !== 'pick') return;
+    const epoch = this.epoch;
+    this.setImportState({ step: 'analyzing', error: null });
+    api.analyzeImport(x.files).then((analysis) => {
+      if (epoch !== this.epoch) return;
+      /** @type {Record<string, number | null>} */
+      const choices = {};
+      for (const m of analysis.matches) choices[m.key] = m.choice;
+      this.setImportState({ step: 'review', analysis, choices, extra: {}, searchFor: null });
+    }, (e) => { if (epoch === this.epoch) this.setImportState({ step: 'pick', error: importErrorText(e) }); });
+  }
+  /** @param {string} key @param {number | null} id */
+  chooseImport(key, id) { this.setState((/** @type {State} */ s) => ({ imp: { ...s.imp, choices: { ...s.imp.choices, [key]: id } } })); }
+  /** @param {string} key @param {string} title */
+  openImportSearch(key, title) {
+    this.setImportState({ searchFor: key, searchQ: title, searchResults: null });
+    this.searchImport(title);
+  }
+  /** Recherche TMDB pour une série à confirmer : 300 ms après la dernière frappe, réponses périmées ignorées. @param {string} q */
+  searchImport(q) {
+    this.setImportState({ searchQ: q });
+    clearTimeout(this.importSearchTimer);
+    const seq = ++this.importSearchSeq;
+    if (q.trim().length < 2) { this.setImportState({ searchResults: null }); return; }
+    this.importSearchTimer = setTimeout(() => {
+      api.search(q.trim()).then((r) => { if (seq === this.importSearchSeq) this.setImportState({ searchResults: r.results.slice(0, 6) }); },
+        () => { if (seq === this.importSearchSeq) this.setImportState({ searchResults: [] }); });
+    }, 300);
+  }
+  /** Série trouvée par la recherche : ajoutée aux candidats et choisie. @param {string} key @param {any} r */
+  pickImportSearch(key, r) {
+    this.setState((/** @type {State} */ s) => ({ imp: { ...s.imp,
+      extra: { ...s.imp.extra, [key]: [...(s.imp.extra[key] || []).filter((c) => c.id !== r.id), { id: r.id, name: r.name, year: r.year, seasonCount: r.seasonCount || 0, posterPath: r.posterPath }] },
+      choices: { ...s.imp.choices, [key]: r.id }, searchFor: null, searchResults: null } }));
   }
   runImport() {
-    const x = this.state.importSheet;
-    if (!x || !x.files || x.step !== 'preview') return;
+    const x = this.state.imp;
+    if (!x.files || x.step !== 'review') return;
     const epoch = this.epoch;
-    this.setImport({ step: 'importing', error: null }, epoch);
-    api.importHistory(x.files, false).then((r) => {
+    this.setImportState({ step: 'importing', error: null });
+    api.importHistory(x.files, x.choices).then((r) => {
       if (epoch !== this.epoch) return;
-      // Tout ce qui a été chargé est périmé : listes et fiches relues.
-      this.setState({ importSheet: null, tl: null, hist: null, shelf: null, mine: null, shows: {}, seasons: {} });
-      this.loadTab(this.state.tab);
-      this.toast('Historique importé : ' + plural(r.report.episodes.imported, 'épisode', 'épisodes'));
-    }, (e) => this.setImport({ step: 'preview', error: importErrorText(e) }, epoch));
+      // Tout ce qui a été chargé est périmé : listes et fiches seront relues.
+      this.setState((/** @type {State} */ s) => ({ imp: { ...s.imp, step: 'done', report: r.report, files: null, analysis: null }, tl: null, hist: null, shelf: null, mine: null, shows: {}, seasons: {} }));
+    }, (e) => { if (epoch === this.epoch) this.setImportState({ step: 'review', error: importErrorText(e) }); });
+  }
+  closeImport() {
+    this.setState({ imp: emptyImport() });
+    this.back();
+    this.loadTab(this.state.tab);
   }
 
   // ---------- parrainages ----------
@@ -1108,6 +1156,7 @@ export class App extends Component {
   screenReady(st) {
     const top = st.stack[st.stack.length - 1];
     if (!top) return st.tab === 'decote' ? !!st.shelf : st.tab === 'series' ? !!st.mine : true;
+    if (top.type === 'import') return true;
     if (top.type === 'invites') return !!st.invites;
     if (top.type === 'admin') return !!st.users;
     if (top.type === 'show') return !!st.shows[top.show];
@@ -1346,7 +1395,8 @@ export class App extends Component {
     if (st.auth) return html`${viewAuth(this, st)}${toast}`;
     const top = st.stack[st.stack.length - 1];
     let screen;
-    if (top && top.type === 'invites') screen = viewInvites(this, st);
+    if (top && top.type === 'import') screen = viewImport(this, st.imp);
+    else if (top && top.type === 'invites') screen = viewInvites(this, st);
     else if (top && top.type === 'admin') screen = viewAdmin(this, st);
     else if (top && top.type === 'show') screen = viewShow(this, st, top);
     else if (top && top.type === 'season') screen = viewSeason(this, st, top);
@@ -1374,7 +1424,6 @@ export class App extends Component {
       ${st.picker ? pickerSheet(st.picker, this.closePicker) : null}
       ${st.linkSheet ? linkSheetView(this, st.linkSheet) : null}
       ${st.exportSheet ? exportSheetView(this, st.exportSheet) : null}
-      ${st.importSheet ? importSheetView(this, st.importSheet) : null}
       ${account ? accountSheet(this, st, account) : null}
       ${st.delSelf ? deleteSelfSheet(this, st.delSelf) : null}`;
   }

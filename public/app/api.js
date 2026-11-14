@@ -64,6 +64,15 @@ async function call(method, path, body, signal) {
   try { return await res.json(); } catch { return null; }
 }
 
+/** Appel d'import : en cas d'erreur, la liste des fichiers analysés accompagne l'erreur. @param {string} path @param {unknown} body */
+async function importCall(path, body) {
+  const res = await send('POST', path, body);
+  let data = null;
+  try { data = await res.json(); } catch { /* corps vide ou non JSON */ }
+  if (!res.ok) throw Object.assign(new ApiError(res.status, (data && data.error) || 'http_' + res.status, data && data.field), { files: data && data.files });
+  return data;
+}
+
 /** Ouverture ou fermeture de session réussie. @template T @param {Promise<T>} p */
 const session = (p) => p.then((r) => { sessionGen++; return r; });
 
@@ -115,16 +124,13 @@ export const api = {
   /** @param {string} password */
   deleteMe: (password) => session(call('DELETE', '/me', { password })),
   /**
-   * Import d'historique (TV Time, BetaSeries) ; fichier non reconnu : ApiError 'import_format' avec files.
-   * @param {{ name: string, text: string }[]} files @param {boolean} dryRun
+   * Import d'historique (TV Time, BetaSeries), étape 1 : séries proposées, à confirmer.
+   * Fichier non reconnu : ApiError 'import_format' avec files.
+   * @param {{ name: string, text: string }[]} files
    */
-  importHistory: async (files, dryRun) => {
-    const res = await send('POST', '/import', { files, dryRun });
-    let data = null;
-    try { data = await res.json(); } catch { /* corps vide ou non JSON */ }
-    if (!res.ok) throw Object.assign(new ApiError(res.status, (data && data.error) || 'http_' + res.status, data && data.field), { files: data && data.files });
-    return data;
-  },
+  analyzeImport: (files) => importCall('/import/analyze', { files }),
+  /** Étape 2 : import avec les choix (clé de série → id TMDB, ou null). @param {{ name: string, text: string }[]} files @param {Record<string, number | null>} choices */
+  importHistory: (files, choices) => importCall('/import', { files, choices }),
   /** Export RGPD : texte JSON et nom de fichier proposé par le serveur. @param {string} fallbackName */
   exportMe: async (fallbackName) => {
     const res = await send('GET', '/me/export');

@@ -40,14 +40,18 @@ if (files.some((f) => f.error)) process.exit(1);
 console.log(`${data.watches.length} visionnages, ${data.series.length} séries${dryRun ? ' (essai : rien ne sera écrit)' : ''}`);
 
 const tmdb = createTmdb({ token: config.tmdbToken });
-const report = await importHistory({ db, catalog: createCatalog({ db, tmdb }), log: (m) => console.log(m) }, user.id, data, { dryRun });
+const { matches, report } = await importHistory({ db, catalog: createCatalog({ db, tmdb }), log: (m) => console.log(m) }, user.id, data, { dryRun });
 db.close();
 
-const { shows, episodes, relations } = report;
-console.log(`séries : ${shows.found} retrouvées, ${shows.missing.length} non retrouvées`);
-for (const s of shows.missing) console.log(`  - ${s}`);
-if (shows.approximate.length) console.log('titres rapprochés (à vérifier) :');
-for (const a of shows.approximate) console.log(`  - ${a.title} → ${a.matched}`);
+// En ligne de commande, les séries proposées sont acceptées : on liste celles qu'une personne aurait dû confirmer.
+const KIND = { ambiguous: 'homonymes', approximate: 'titre rapproché', missing: 'introuvable' } as const;
+const toCheck = matches.filter((m) => m.kind !== 'sure');
+console.log(`séries : ${matches.length - toCheck.length} sûres, ${toCheck.length} à vérifier`);
+for (const m of toCheck) {
+  const pick = m.candidates.find((c) => c.id === m.choice);
+  console.log(`  - ${m.title}${m.year ? ` (${m.year})` : ''} [${KIND[m.kind as keyof typeof KIND]}] → ${pick ? `${pick.name} (${pick.year ?? '?'}, ${pick.hits}/${m.episodes} épisodes)` : 'non importée'}`);
+}
+const { episodes, relations } = report;
 console.log(`épisodes : ${episodes.imported} importés, ${episodes.alreadySeen} déjà vus, ${episodes.missing.length} non retrouvés`);
 const bySeries = new Map<string, string[]>();
 for (const e of episodes.missing) bySeries.set(e.show, [...(bySeries.get(e.show) ?? []), `S${e.season}E${e.number}`]);

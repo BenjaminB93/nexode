@@ -4,7 +4,7 @@ import { detectFormat, parseImportFiles } from '../src/domain/import-files.ts';
 import { normTitle, parseCsv, splitYear, wallTimeToUtc } from '../src/domain/imports.ts';
 import { parseTvTime } from '../src/domain/tvtime.ts';
 import { parseBetaSeriesEpisodes, parseBetaSeriesSeries } from '../src/domain/betaseries.ts';
-import { importHistory } from '../src/usecases/import.ts';
+import { applyImport, importHistory, matchShows } from '../src/usecases/import.ts';
 import { FakeCatalog, epId, testDb } from './helpers/fake-catalog.ts';
 import { addUser } from './helpers/auth.ts';
 
@@ -117,10 +117,11 @@ const watchedRows = (db: ReturnType<typeof testDb>, userId: number) =>
 
 test('import TV Time : séries par id TheTVDB, épisodes par position puis par id d\'épisode, suivi et De côté', async () => {
   const { db, catalog, userId } = setup();
-  const r = await importHistory({ db, catalog }, userId, parseTvTime(TVTIME));
-  assert.deepEqual(r.shows, { found: 2, missing: ['Inconnue'], approximate: [] });
+  const { matches, report: r } = await importHistory({ db, catalog }, userId, parseTvTime(TVTIME));
+  assert.deepEqual(matches.map((m) => [m.title, m.kind, m.choice]), [['Série A', 'sure', 1001], ['Série B', 'sure', 1002], ['Inconnue', 'missing', null]]);
+  assert.deepEqual(r.shows, { imported: 2, skipped: ['Inconnue'] });
   assert.equal(r.episodes.imported, 4);
-  assert.deepEqual(r.episodes.missing, [{ show: 'Série A', season: 9, number: 9 }, { show: 'Inconnue', season: 1, number: 1 }]);
+  assert.deepEqual(r.episodes.missing, [{ show: 'Série A', season: 9, number: 9 }], 'une série non importée ne compte pas ses épisodes comme manquants');
   assert.deepEqual(r.relations, { followed: 1, shelved: 1, kept: 0 });
   assert.deepEqual(watchedRows(db, userId), [
     [epId(1001, 1, 1), '2024-01-10T20:00:00.000Z'], [epId(1001, 1, 2), '2024-01-11T20:00:00.000Z'],
@@ -151,9 +152,11 @@ test('import BetaSeries : homonymes départagés par les épisodes vus, titre ra
     const words = normWords(query);
     return all.filter((s) => (!year || s.year === year) && words.some((w) => normWords(s.name).includes(w)));
   };
-  const r = await importHistory({ db, catalog }, userId, data);
-  assert.deepEqual(r.shows.missing, []);
-  assert.deepEqual(r.shows.approximate, [{ title: "Marvel's She-Hulk", matched: 'She-Hulk : Avocate' }]);
+  const { matches } = await importHistory({ db, catalog }, userId, data);
+  const m = new Map(matches.map((x) => [x.title + (x.year ? ` (${x.year})` : ''), x]));
+  assert.deepEqual([m.get('Doctor Who')?.kind, m.get('Doctor Who')?.choice], ['sure', 2002], 'homonyme sans aucun épisode vu : pas de question');
+  assert.deepEqual([m.get('Doctor Who (2005)')?.kind, m.get('Doctor Who (2005)')?.choice], ['sure', 2001], 'année donnée : un seul titre identique');
+  assert.deepEqual([m.get("Marvel's She-Hulk")?.kind, m.get("Marvel's She-Hulk")?.choice], ['approximate', 3001]);
   assert.deepEqual(watchedRows(db, userId).map(([id]) => id), [epId(2001, 1, 1), epId(2002, 2, 2), epId(2002, 2, 3), epId(3001, 1, 1)]);
   assert.deepEqual(db.prepare('SELECT show_id AS id, state FROM user_shows WHERE user_id = ? ORDER BY show_id').all(userId).map((x: any) => [x.id, x.state]),
     [[2001, 'shelved'], [2002, 'followed'], [3001, 'followed']]);
@@ -167,7 +170,7 @@ test('import de plusieurs sources : plus ancien visionnage gardé ; de côté se
     { name: 'episodes.csv', text: bsEpisodes([['Série A', 'S01E01', '2023-06-01 12:00:00'], ['Série A', 'S01E03', '2023-06-02 12:00:00']]) },
     { name: 'series.csv', text: bsSeries([['Série B', 0]]) },
   ]);
-  const r = await importHistory({ db, catalog }, userId, data);
+  const { report: r } = await importHistory({ db, catalog }, userId, data);
   const rows = new Map(watchedRows(db, userId) as [number, string][]);
   assert.equal(rows.get(epId(1001, 1, 1)), '2023-06-01T10:00:00.000Z', 'BetaSeries plus ancien que TV Time');
   assert.equal(rows.get(epId(1001, 1, 3)), '2023-06-02T10:00:00.000Z');
@@ -178,50 +181,64 @@ test('import de plusieurs sources : plus ancien visionnage gardé ; de côté se
 test('import relancé : rien ne change (dates et états existants gardés) ; essai à blanc sans écriture', async () => {
   const { db, catalog, userId } = setup();
   const data = parseTvTime(TVTIME);
-  const dry = await importHistory({ db, catalog }, userId, data, { dryRun: true });
+  const { report: dry } = await importHistory({ db, catalog }, userId, data, { dryRun: true });
   assert.equal(dry.episodes.imported, 4);
   assert.equal((db.prepare('SELECT count(*) n FROM watched').get() as { n: number }).n, 0);
   assert.equal((db.prepare('SELECT count(*) n FROM user_shows').get() as { n: number }).n, 0);
 
   db.prepare("INSERT INTO watched (user_id, episode_id, watched_at) VALUES (?, ?, '2025-05-05T05:05:05.000Z')").run(userId, epId(1001, 1, 1));
   db.prepare("INSERT INTO user_shows (user_id, show_id, state, added_at) VALUES (?, 1001, 'shelved', '2025-01-01T00:00:00.000Z')").run(userId);
-  const first = await importHistory({ db, catalog }, userId, data);
+  const { report: first } = await importHistory({ db, catalog }, userId, data);
   assert.deepEqual([first.episodes.imported, first.episodes.alreadySeen], [3, 1]);
   assert.deepEqual(first.relations, { followed: 0, shelved: 1, kept: 1 });
   assert.equal((db.prepare('SELECT watched_at AS at FROM watched WHERE episode_id = ?').get(epId(1001, 1, 1)) as { at: string }).at, '2025-05-05T05:05:05.000Z');
   assert.equal((db.prepare('SELECT state FROM user_shows WHERE show_id = 1001').get() as { state: string }).state, 'shelved');
 
-  const again = await importHistory({ db, catalog }, userId, data);
+  const { report: again } = await importHistory({ db, catalog }, userId, data);
   assert.deepEqual([again.episodes.imported, again.episodes.alreadySeen], [0, 4]);
   assert.deepEqual(again.relations, { followed: 0, shelved: 0, kept: 2 });
 });
 
 // ---------- API ----------
 
-test('POST /api/import : essai puis import, fichier non reconnu refusé, corps de plus de 1 Mo accepté', async () => {
+test("API d'import : analyse (rien d'écrit), puis import avec les choix ; fichier non reconnu refusé ; corps de plus de 1 Mo", async () => {
   const { createApp } = await import('../src/http/app.ts');
   const { sessionCookie } = await import('./helpers/auth.ts');
   const { db, catalog, userId } = setup();
   const app = createApp({ db, catalog, now: () => new Date('2026-11-14T12:00:00.000Z') });
   const cookie = sessionCookie(db, userId, '2026-11-14T12:00:00.000Z');
-  const post = async (body: unknown) => {
-    const res = await app.request('/api/import', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const post = async (path: string, body: unknown) => {
+    const res = await app.request(path, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) });
     return { status: res.status, body: (await res.json()) as any };
   };
-  const bad = await post({ files: [{ name: 'notes.csv', text: 'a,b\n1,2' }], dryRun: true });
+  const bad = await post('/api/import/analyze', { files: [{ name: 'notes.csv', text: ['a,b', '1,2'].join('\n') }] });
   assert.deepEqual([bad.status, bad.body.error, bad.body.files[0].format], [400, 'import_format', null]);
 
   // Remplissage : le fichier dépasse la limite générale de 1 Mo.
-  const big = TVTIME + '\n' + Array.from({ length: 12000 }, () => ','.repeat(28) + 'x').join('\n');
-  const dry = await post({ files: [{ name: 'tracking-prod-records-v2.csv', text: big }], dryRun: true });
-  assert.equal(dry.status, 200);
-  assert.equal(dry.body.report.episodes.imported, 4);
+  const big = [TVTIME, ...Array.from({ length: 12000 }, () => ','.repeat(28) + 'x')].join('\n');
+  const files = [{ name: 'tracking-prod-records-v2.csv', text: big }];
+  const analyzed = await post('/api/import/analyze', { files });
+  assert.equal(analyzed.status, 200);
+  assert.deepEqual(analyzed.body.matches.map((m: any) => [m.key, m.kind, m.choice]), [['tvdb:10', 'sure', 1001], ['tvdb:20', 'sure', 1002], ['tvdb:99', 'missing', null]]);
   assert.equal((db.prepare('SELECT count(*) n FROM watched').get() as { n: number }).n, 0);
 
-  const done = await post({ files: [{ name: 'tracking-prod-records-v2.csv', text: TVTIME }], dryRun: false });
-  assert.deepEqual([done.status, done.body.files[0].format, done.body.report.relations.followed], [200, 'tvtime', 1]);
-  assert.equal((db.prepare('SELECT count(*) n FROM watched').get() as { n: number }).n, 4);
-  assert.equal((await post({ files: [], dryRun: true })).status, 400);
+  // L'utilisateur écarte la série B.
+  const done = await post('/api/import', { files, choices: { 'tvdb:10': 1001, 'tvdb:20': null, 'tvdb:99': null } });
+  assert.equal(done.status, 200);
+  assert.deepEqual([done.body.report.shows.imported, done.body.report.episodes.imported, done.body.report.relations.followed], [1, 3, 1]);
+  assert.deepEqual(watchedRows(db, userId).map(([id]) => id), [epId(1001, 1, 1), epId(1001, 1, 2), epId(1001, 2, 1)]);
+  assert.equal((await post('/api/import', { files, choices: { 'tvdb:10': 'x' } })).status, 400);
+  assert.equal((await post('/api/import/analyze', { files: [] })).status, 400);
+});
+
+test("import : une série choisie par l'utilisateur hors des candidats (recherche) est utilisée", async () => {
+  const { db, catalog, userId } = setup();
+  const { data } = parseImportFiles([{ name: 'episodes.csv', text: bsEpisodes([['Mystère', 'S01E01', '2021-03-01 21:00:00']]) }]);
+  const matches = await matchShows({ db, catalog }, userId, data);
+  assert.deepEqual(matches.map((m) => [m.kind, m.choice]), [['missing', null]]);
+  const r = await applyImport({ db, catalog }, userId, data, new Map([[matches[0]!.key, 1002]]));
+  assert.equal(r.episodes.imported, 1);
+  assert.deepEqual(watchedRows(db, userId).map(([id]) => id), [epId(1002, 1, 1)]);
 });
 
 test('homonymes à égalité d\'épisodes : la série déjà connue l\'emporte (même import ou historique existant)', async () => {
@@ -246,5 +263,7 @@ test('homonymes à égalité d\'épisodes : la série déjà connue l\'emporte (
       await importHistory({ db, catalog }, userId, parseImportFiles([bs]).data);
     }
     assert.deepEqual(watchedRows(db, userId).map(([id]) => id), [1, 3, 4, 5].map((e) => epId(5011, 1, e)), mode);
+    const again = (await matchShows({ db, catalog }, userId, parseImportFiles([bs]).data))[0];
+    assert.deepEqual([again?.kind, again?.choice, again?.candidates.map((c) => [c.id, c.hits])], ['ambiguous', 5011, [[5011, 4], [5020, 5]]], 'cas serré : à confirmer, la série connue proposée');
   }
 });
