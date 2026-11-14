@@ -3,6 +3,7 @@
 export type SearchResult = {
   id: number;                 // id TMDB
   name: string;
+  originalName: string;
   year: number | null;
   posterPath: string | null;  // chemin TMDB, ex. '/abc.jpg'
 };
@@ -14,6 +15,10 @@ export interface Catalog {
   refreshShow(showId: number): Promise<void>;
   // Plateformes de chaque saison pour un pays ; relevé au plus une fois par 24 h.
   ensureProviders(showId: number, country: string): Promise<void>;
-  // Recherche TMDB en direct (pas de cache), en français.
-  searchShows(query: string): Promise<SearchResult[]>;
+  // Recherche TMDB en direct (pas de cache), en français ; year = année de première diffusion.
+  searchShows(query: string, year?: number): Promise<SearchResult[]>;
+  // Id TMDB d'une série d'après son id TheTVDB (imports) ; null si inconnue. Lit d'abord le cache local.
+  findShowByTvdb(tvdbId: number): Promise<number | null>;
+  // Position TMDB d'un épisode d'après son id TheTVDB ; null si inconnu.
+  findEpisodeByTvdb(tvdbEpisodeId: number): Promise<{ showId: number; season: number; number: number } | null>;
 }

@@ -15,6 +15,8 @@ function recordingCatalog(failIds: number[] = []) {
     ensureShow: async () => assert.fail('ensureShow inattendu'),
     ensureProviders: async () => assert.fail('ensureProviders inattendu'),
     searchShows: async () => assert.fail('searchShows inattendu'),
+    findShowByTvdb: async () => assert.fail('findShowByTvdb inattendu'),
+    findEpisodeByTvdb: async () => assert.fail('findEpisodeByTvdb inattendu'),
     async refreshShow(id) {
       refreshed.push(id);
       if (failIds.includes(id)) throw new Error(`TMDB 500 sur /tv/${id}`);

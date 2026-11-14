@@ -258,7 +258,7 @@ test('recherche : requête nettoyée, résultats convertis, vide → aucun appel
 
   const results = await t.catalog.searchShows('  the   last of us ');
   assert.equal(t.tmdb.calls(), 1);
-  assert.deepEqual(results[0], { id: 100088, name: 'The Last of Us', year: 2023, posterPath: '/4pMd9VAdqm96KA2W4X8yetgc7EF.jpg' });
+  assert.deepEqual(results[0], { id: 100088, name: 'The Last of Us', originalName: 'The Last of Us', year: 2023, posterPath: '/4pMd9VAdqm96KA2W4X8yetgc7EF.jpg' });
   assert.equal(results[1]!.posterPath, null);
   assert.equal(results.length, 3);
 

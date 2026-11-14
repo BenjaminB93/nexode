@@ -1,22 +1,24 @@
-// Importe un export TV Time (tracking-prod-records-v2.csv) dans le compte <nom>.
-// Usage : node --env-file-if-exists=.env src/cli/import-tvtime.ts <fichier.csv> <nom> [--essai]
+// Importe des exports TV Time (tracking-prod-records-v2.csv) et/ou BetaSeries (episodes-*.csv, series-*.csv) dans le compte <nom>.
+// Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier.csv>... [--essai]
 // --essai : affiche le bilan sans rien écrire dans le compte.
 import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { loadConfig } from '../config.ts';
 import { openDb } from '../db/index.ts';
 import { migrate } from '../db/migrate.ts';
 import { usernameKey } from '../domain/accounts.ts';
-import { parseTvTime } from '../domain/tvtime.ts';
+import { parseImportFiles } from '../domain/import-files.ts';
+import { FORMAT_LABELS } from '../domain/imports.ts';
 import { createCatalog } from '../infra/catalog.ts';
 import { getAccountByKey } from '../infra/repos.ts';
 import { createTmdb } from '../infra/tmdb.ts';
-import { importTvTime } from '../usecases/import-tvtime.ts';
+import { importHistory } from '../usecases/import.ts';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--essai');
-const [file, username] = args.filter((a) => a !== '--essai');
-if (!file || !username) {
-  console.error('Usage : node --env-file-if-exists=.env src/cli/import-tvtime.ts <fichier.csv> <nom> [--essai]');
+const [username, ...paths] = args.filter((a) => a !== '--essai');
+if (!username || !paths.length) {
+  console.error('Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier.csv>... [--essai]');
   process.exit(2);
 }
 const config = loadConfig();
@@ -32,15 +34,20 @@ if (!user) {
   process.exit(1);
 }
 
-const data = parseTvTime(readFileSync(file, 'utf8'));
-console.log(`${data.watches.length} épisodes vus, ${data.series.length} séries dans l'export${dryRun ? ' (essai : rien ne sera écrit)' : ''}`);
+const { data, files } = parseImportFiles(paths.map((p) => ({ name: basename(p), text: readFileSync(p, 'utf8') })));
+for (const f of files) console.log(`${f.name} : ${f.error ? `refusé (${f.error})` : FORMAT_LABELS[f.format!]}`);
+if (files.some((f) => f.error)) process.exit(1);
+console.log(`${data.watches.length} visionnages, ${data.series.length} séries${dryRun ? ' (essai : rien ne sera écrit)' : ''}`);
+
 const tmdb = createTmdb({ token: config.tmdbToken });
-const report = await importTvTime({ db, tmdb, catalog: createCatalog({ db, tmdb }), log: (m) => console.log(m) }, user.id, data, { dryRun });
+const report = await importHistory({ db, catalog: createCatalog({ db, tmdb }), log: (m) => console.log(m) }, user.id, data, { dryRun });
 db.close();
 
 const { shows, episodes, relations } = report;
 console.log(`séries : ${shows.found} retrouvées, ${shows.missing.length} non retrouvées`);
-for (const s of shows.missing) console.log(`  - ${s.name} (TheTVDB ${s.tvdbId})`);
+for (const s of shows.missing) console.log(`  - ${s}`);
+if (shows.approximate.length) console.log('titres rapprochés (à vérifier) :');
+for (const a of shows.approximate) console.log(`  - ${a.title} → ${a.matched}`);
 console.log(`épisodes : ${episodes.imported} importés, ${episodes.alreadySeen} déjà vus, ${episodes.missing.length} non retrouvés`);
 const bySeries = new Map<string, string[]>();
 for (const e of episodes.missing) bySeries.set(e.show, [...(bySeries.get(e.show) ?? []), `S${e.season}E${e.number}`]);

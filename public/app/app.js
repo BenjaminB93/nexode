@@ -18,6 +18,7 @@ import { viewSeason } from './views/season.js';
 import { viewEpisode } from './views/episode.js';
 import { viewAuth } from './views/auth.js';
 import { accountSheet, deleteSelfSheet, exportSheetView, linkSheetView, viewAdmin, viewInvites } from './views/account.js';
+import { importSheetView } from './views/import.js';
 
 /** Glissement à dépasser pour valider un swipe (px). */
 export const THRESHOLD = 110;
@@ -61,6 +62,8 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null, wait?: boolean }} Form
  * Feuille « Supprimer mon compte » ; bad : champ refusé par le serveur (seul le mot de passe peut l'être).
  * @typedef {Omit<Form, 'name'>} DelSelf
+ * Feuille d'import : fichiers lus, bilan de l'essai à blanc (result), étape en cours.
+ * @typedef {{ files: { name: string, text: string }[] | null, step: 'pick' | 'reading' | 'analyzing' | 'preview' | 'importing', result: any, error: string | null }} ImportSheet
  */
 
 /**
@@ -74,9 +77,21 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  *   invites: any[] | null, users: any[] | null, creatingInvite: boolean, resetBusy: boolean,
  *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
  *   account: number | null, exportSheet: { data: any } | null,
- *   delSelf: DelSelf | null,
+ *   delSelf: DelSelf | null, importSheet: ImportSheet | null,
  * }} State
  */
+
+/** Message d'échec d'un import. @param {any} e */
+function importErrorText(e) {
+  if (e && e.code === 'import_format') {
+    const bad = (e.files || []).filter((/** @type {any} */ f) => f.error).map((/** @type {any} */ f) => f.name);
+    return 'Fichier non reconnu : ' + bad.join(', ');
+  }
+  if (e && e.code === 'import_busy') return 'Un import est déjà en cours';
+  if (e && e.code === 'payload_too_large') return 'Fichiers trop volumineux';
+  if (e && e.code === 'network') return 'Serveur injoignable';
+  return 'Import impossible';
+}
 
 /** @returns {Form} */
 const emptyForm = () => ({ name: '', pw: '', show: false, busy: false, error: null, bad: null });
@@ -93,7 +108,7 @@ function initialState(theme) {
     errs: {},
     auth: null, form: emptyForm(),
     invites: null, users: null, creatingInvite: false, resetBusy: false,
-    linkSheet: null, account: null, exportSheet: null, delSelf: null,
+    linkSheet: null, account: null, exportSheet: null, delSelf: null, importSheet: null,
   };
 }
 
@@ -873,6 +888,36 @@ export class App extends Component {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // ---------- import d'historique ----------
+  openImport() { if (!this.state.importSheet) this.setState({ importSheet: { files: null, step: 'pick', result: null, error: null } }); }
+  /** @param {Partial<ImportSheet>} patch @param {number} epoch */
+  setImport(patch, epoch) {
+    if (epoch !== this.epoch) return;
+    this.setState((/** @type {State} */ s) => (s.importSheet ? { importSheet: { ...s.importSheet, ...patch } } : null));
+  }
+  /** Fichiers choisis : lus en texte, puis analysés tout de suite (essai à blanc côté serveur). @param {FileList} list */
+  pickImportFiles(list) {
+    const epoch = this.epoch;
+    this.setImport({ step: 'reading', result: null, error: null }, epoch);
+    Promise.all([...list].map((f) => f.text().then((text) => ({ name: f.name, text })))).then((files) => {
+      this.setImport({ files, step: 'analyzing' }, epoch);
+      return api.importHistory(files, true).then((result) => this.setImport({ step: 'preview', result }, epoch));
+    }).catch((e) => this.setImport({ step: 'pick', error: importErrorText(e) }, epoch));
+  }
+  runImport() {
+    const x = this.state.importSheet;
+    if (!x || !x.files || x.step !== 'preview') return;
+    const epoch = this.epoch;
+    this.setImport({ step: 'importing', error: null }, epoch);
+    api.importHistory(x.files, false).then((r) => {
+      if (epoch !== this.epoch) return;
+      // Tout ce qui a été chargé est périmé : listes et fiches relues.
+      this.setState({ importSheet: null, tl: null, hist: null, shelf: null, mine: null, shows: {}, seasons: {} });
+      this.loadTab(this.state.tab);
+      this.toast('Historique importé : ' + plural(r.report.episodes.imported, 'épisode', 'épisodes'));
+    }, (e) => this.setImport({ step: 'preview', error: importErrorText(e) }, epoch));
+  }
+
   // ---------- parrainages ----------
   openInvites() { this.push({ type: 'invites', show: 0 }); }
   loadInvites() {
@@ -1329,6 +1374,7 @@ export class App extends Component {
       ${st.picker ? pickerSheet(st.picker, this.closePicker) : null}
       ${st.linkSheet ? linkSheetView(this, st.linkSheet) : null}
       ${st.exportSheet ? exportSheetView(this, st.exportSheet) : null}
+      ${st.importSheet ? importSheetView(this, st.importSheet) : null}
       ${account ? accountSheet(this, st, account) : null}
       ${st.delSelf ? deleteSelfSheet(this, st.delSelf) : null}`;
   }

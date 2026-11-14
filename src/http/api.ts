@@ -6,6 +6,8 @@ import { RELATIONS } from '../domain/series.ts';
 import { deleteMe, exportData } from '../usecases/account.ts';
 import { createResetLink, deleteUser, listUsers, setRole } from '../usecases/admin.ts';
 import { type Ctx, AppError, InvalidInputError } from '../usecases/context.ts';
+import { parseImportFiles } from '../domain/import-files.ts';
+import { importHistory } from '../usecases/import.ts';
 import { createInvite, listInvites, revokeInvite } from '../usecases/invites.ts';
 import { HISTORY_PAGE, decodeCursor, history, myShows, shelf, timeline } from '../usecases/lists.ts';
 import { setRelation } from '../usecases/relation.ts';
@@ -198,6 +200,32 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     const n = positiveId(c.req.param('n'), 'n');
     await jsonBody(c, []);
     return c.json(markSeason(ctx, showId, n));
+  });
+
+  // Import d'historique (TV Time, BetaSeries) : fichiers CSV lus côté client, envoyés en texte.
+  // dryRun = bilan sans écriture. Un seul import à la fois (appels TMDB, mémoire du Pi).
+  let importing = false;
+  api.post('/import', async (c) => {
+    const ctx = ctxOf(c);
+    const body = await jsonBody(c, ['files', 'dryRun']);
+    const dryRun = bool(body.dryRun, 'dryRun');
+    if (!Array.isArray(body.files) || body.files.length === 0 || body.files.length > 5) throw new InvalidInputError('files');
+    const files = body.files.map((f: unknown) => {
+      if (f === null || typeof f !== 'object' || Array.isArray(f)) throw new InvalidInputError('files');
+      const { name, text, ...rest } = f as Record<string, unknown>;
+      if (Object.keys(rest).length || typeof text !== 'string') throw new InvalidInputError('files');
+      return { name: str(name, 'files', 200), text };
+    });
+    const parsed = parseImportFiles(files);
+    if (parsed.files.some((f) => f.error)) return c.json({ error: 'import_format', files: parsed.files }, 400);
+    if (importing) throw new AppError('import_busy', 'un import est déjà en cours');
+    importing = true;
+    try {
+      const report = await importHistory({ db: ctx.db, catalog: ctx.catalog }, ctx.user.id, parsed.data, { dryRun });
+      return c.json({ files: parsed.files, watches: parsed.data.watches.length, report });
+    } finally {
+      importing = false;
+    }
   });
 
   return api;

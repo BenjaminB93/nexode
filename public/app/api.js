@@ -114,6 +114,17 @@ export const api = {
   // Mon compte
   /** @param {string} password */
   deleteMe: (password) => session(call('DELETE', '/me', { password })),
+  /**
+   * Import d'historique (TV Time, BetaSeries) ; fichier non reconnu : ApiError 'import_format' avec files.
+   * @param {{ name: string, text: string }[]} files @param {boolean} dryRun
+   */
+  importHistory: async (files, dryRun) => {
+    const res = await send('POST', '/import', { files, dryRun });
+    let data = null;
+    try { data = await res.json(); } catch { /* corps vide ou non JSON */ }
+    if (!res.ok) throw Object.assign(new ApiError(res.status, (data && data.error) || 'http_' + res.status, data && data.field), { files: data && data.files });
+    return data;
+  },
   /** Export RGPD : texte JSON et nom de fichier proposé par le serveur. @param {string} fallbackName */
   exportMe: async (fallbackName) => {
     const res = await send('GET', '/me/export');

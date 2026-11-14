@@ -20,6 +20,8 @@ export function jsonId(raw: unknown, field: string): number {
 export const MAX_BATCH = 10_000;
 // Corps de requête max : un lot de MAX_BATCH entrées à restaurer pèse environ 650 Ko.
 export const MAX_BODY_BYTES = 1024 * 1024;
+// Import d'historique (exports TV Time / BetaSeries, quelques Mo de CSV) : seule route qui accepte plus.
+export const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
 export function idList(raw: unknown, field: string, max = MAX_BATCH): number[] {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > max) throw new InvalidInputError(field);

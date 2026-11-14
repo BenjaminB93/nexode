@@ -56,7 +56,11 @@ type TmdbShow = {
 
 type TmdbProvider = { provider_id: number; provider_name: string; logo_path?: string | null; display_priority?: number };
 type TmdbProviders = { results?: Record<string, { flatrate?: TmdbProvider[] } | undefined> };
-type TmdbSearch = { results?: { id: number; name: string; first_air_date?: string | null; poster_path?: string | null }[] };
+type TmdbSearch = { results?: { id: number; name: string; original_name?: string; first_air_date?: string | null; poster_path?: string | null }[] };
+type TmdbFind = {
+  tv_results?: { id: number }[];
+  tv_episode_results?: { show_id: number; season_number: number; episode_number: number }[];
+};
 
 type EpisodeRow = {
   id: number;
@@ -318,15 +322,27 @@ export function createCatalog({ db, tmdb, now = () => new Date(), warn = console
     });
   }
 
-  async function searchShows(query: string): Promise<SearchResult[]> {
+  async function searchShows(query: string, year?: number): Promise<SearchResult[]> {
     const q = query.replace(/\s+/g, ' ').trim();
     if (!q) return [];
-    const res = await tmdb.get<TmdbSearch>('/search/tv', { query: q, language: 'fr-FR', include_adult: 'false' });
+    const res = await tmdb.get<TmdbSearch>('/search/tv', { query: q, language: 'fr-FR', include_adult: 'false', first_air_date_year: year });
     return (res.results ?? []).slice(0, SEARCH_MAX).map((r) => {
-      const year = Number(text(r.first_air_date).slice(0, 4));
-      return { id: r.id, name: r.name, year: Number.isInteger(year) && year > 0 ? year : null, posterPath: orNull(r.poster_path) };
+      const y = Number(text(r.first_air_date).slice(0, 4));
+      return { id: r.id, name: r.name, originalName: text(r.original_name) || r.name, year: Number.isInteger(y) && y > 0 ? y : null, posterPath: orNull(r.poster_path) };
     });
   }
 
-  return { ensureShow, refreshShow, ensureProviders, searchShows };
+  async function findShowByTvdb(tvdbId: number): Promise<number | null> {
+    const cached = db.prepare('SELECT id FROM shows WHERE tvdb_id = ?').get(tvdbId) as { id: number } | undefined;
+    if (cached) return cached.id;
+    const res = await tmdb.get<TmdbFind>(`/find/${tvdbId}`, { external_source: 'tvdb_id' });
+    return res.tv_results?.[0]?.id ?? null;
+  }
+
+  async function findEpisodeByTvdb(tvdbEpisodeId: number): Promise<{ showId: number; season: number; number: number } | null> {
+    const ep = (await tmdb.get<TmdbFind>(`/find/${tvdbEpisodeId}`, { external_source: 'tvdb_id' })).tv_episode_results?.[0];
+    return ep ? { showId: ep.show_id, season: ep.season_number, number: ep.episode_number } : null;
+  }
+
+  return { ensureShow, refreshShow, ensureProviders, searchShows, findShowByTvdb, findEpisodeByTvdb };
 }

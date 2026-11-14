@@ -85,7 +85,22 @@ export class FakeCatalog implements Catalog {
     const q = query.toLowerCase();
     return [...this.fixtures.values()]
       .filter((f) => f.name.toLowerCase().includes(q))
-      .map((f) => ({ id: f.id, name: f.name, year: Number((f.firstAirDate ?? f.seasons[0]?.[0] ?? '0').slice(0, 4)) || null, posterPath: `/p${f.id}.jpg` }));
+      .map((f) => ({ id: f.id, name: f.name, originalName: f.name, year: Number((f.firstAirDate ?? f.seasons[0]?.[0] ?? '0').slice(0, 4)) || null, posterPath: `/p${f.id}.jpg` }));
+  }
+
+  // Imports : correspondances TheTVDB → TMDB déclarées par le test.
+  tvdbShows = new Map<number, number>();
+  tvdbEpisodes = new Map<number, { showId: number; season: number; number: number }>();
+
+  async findShowByTvdb(tvdbId: number): Promise<number | null> {
+    this.calls.push(`findShowByTvdb ${tvdbId}`);
+    const cached = this.db.prepare('SELECT id FROM shows WHERE tvdb_id = ?').get(tvdbId) as { id: number } | undefined;
+    return cached?.id ?? this.tvdbShows.get(tvdbId) ?? null;
+  }
+
+  async findEpisodeByTvdb(tvdbEpisodeId: number): Promise<{ showId: number; season: number; number: number } | null> {
+    this.calls.push(`findEpisodeByTvdb ${tvdbEpisodeId}`);
+    return this.tvdbEpisodes.get(tvdbEpisodeId) ?? null;
   }
 }
 

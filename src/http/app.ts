@@ -12,7 +12,7 @@ import { AppError, UpstreamError } from '../usecases/context.ts';
 import { createApi } from './api.ts';
 import { type AuthEnv, type Limits, createAuthRoutes, sessionMiddleware } from './auth.ts';
 import { FailureLimiter, TooManyAttemptsError, loginLimits } from './rate-limit.ts';
-import { MAX_BODY_BYTES } from './validate.ts';
+import { MAX_BODY_BYTES, MAX_IMPORT_BYTES } from './validate.ts';
 
 export const PUBLIC_DIR = join(import.meta.dirname, '..', '..', 'public');
 
@@ -40,11 +40,14 @@ const STATUS: Record<string, ContentfulStatusCode> = {
   is_admin: 409,
   last_admin: 409,
   too_many_attempts: 429,
+  import_busy: 409,
   catalog_unavailable: 502,
 };
 
 const noCatalog = (): Promise<never> => Promise.reject(new UpstreamError('catalogue non configuré'));
-const unavailableCatalog: Catalog = { ensureShow: noCatalog, refreshShow: noCatalog, ensureProviders: noCatalog, searchShows: noCatalog };
+const unavailableCatalog: Catalog = {
+  ensureShow: noCatalog, refreshShow: noCatalog, ensureProviders: noCatalog, searchShows: noCatalog, findShowByTvdb: noCatalog, findEpisodeByTvdb: noCatalog,
+};
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -85,7 +88,10 @@ export function createApp(deps: AppDeps): Hono {
     await next();
   });
   // Refusé avant lecture complète : un corps énorme ne doit pas remplir la RAM du conteneur.
-  api.use('*', bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: 'payload_too_large' }, 413) }));
+  const tooLarge = (c: Context) => c.json({ error: 'payload_too_large' }, 413);
+  const smallBody = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: tooLarge });
+  const importBody = bodyLimit({ maxSize: MAX_IMPORT_BYTES, onError: tooLarge });
+  api.use('*', (c, next) => (c.req.path === '/api/import' ? importBody : smallBody)(c, next));
   api.get('/health', (c) => {
     deps.db.prepare('SELECT 1').get();
     return c.json({ ok: true });
