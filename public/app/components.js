@@ -51,21 +51,77 @@ export function segmented(label, segs, cur, onPick, style) {
   </div>`;
 }
 
+/** Geste en cours sur une poignée de feuille (un seul à la fois). @type {{ el: HTMLElement, y0: number, dy: number, t: number, v: number } | null} */
+let drag = null;
+
 /**
- * Feuille en bas d'écran ; toucher le fond referme sans rien changer.
+ * Glisser l'en-tête d'une feuille vers le bas : elle suit le doigt ; relâchée au-delà d'un quart de sa hauteur
+ * (ou lancée vers le bas), elle sort de l'écran puis se ferme, sinon elle revient en place.
+ * État transitoire du geste en DOM direct : aucun rendu pendant le glissement.
+ * @param {() => void} onClose
+ */
+function dragToClose(onClose) {
+  return {
+    /** @param {PointerEvent} ev */
+    onPointerDown(ev) {
+      if (ev.button !== 0) return;
+      const head = /** @type {HTMLElement} */ (ev.currentTarget);
+      const el = /** @type {HTMLElement | null} */ (head.closest('.sheetbox'));
+      if (!el) return;
+      head.setPointerCapture(ev.pointerId);
+      el.style.transition = 'none';
+      drag = { el, y0: ev.clientY, dy: 0, t: ev.timeStamp, v: 0 };
+    },
+    /** @param {PointerEvent} ev */
+    onPointerMove(ev) {
+      if (!drag) return;
+      const dy = Math.max(0, ev.clientY - drag.y0);
+      const dt = ev.timeStamp - drag.t;
+      if (dt > 0) drag.v = (dy - drag.dy) / dt;
+      drag.dy = dy; drag.t = ev.timeStamp;
+      drag.el.style.transform = `translateY(${dy}px)`;
+    },
+    onPointerUp() {
+      if (!drag) return;
+      const { el, dy, v } = drag;
+      drag = null;
+      const close = dy > el.offsetHeight / 4 || (dy > 20 && v > 0.5);
+      el.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      el.style.transform = close ? 'translateY(100%)' : '';
+      // Minuteur plutôt que transitionend : les transitions sont coupées en mode « moins d'animations ».
+      setTimeout(close ? onClose : () => { el.style.transition = ''; }, 200);
+    },
+    onPointerCancel() {
+      if (!drag) return;
+      drag.el.style.transition = '';
+      drag.el.style.transform = '';
+      drag = null;
+    },
+  };
+}
+
+/**
+ * Feuille en bas d'écran ; toucher le fond ou glisser l'en-tête vers le bas referme sans rien changer.
+ * Seul le contenu défile : la poignée et le titre restent visibles.
  * @param {string} title @param {any} sub texte (ou bloc réservé pendant un chargement), null = aucun
  * @param {() => void} onClose @param {any} content
  */
 export function sheet(title, sub, onClose, content) {
+  const d = dragToClose(onClose);
   return html`<div class="overlay backdrop-in" onClick=${onClose}>
     <div role="dialog" class="sheetbox sheet-in" aria-modal="true" aria-label=${title} onClick=${(/** @type {Event} */ ev) => ev.stopPropagation()}
-      style="max-height: 80%; overflow-y: auto; padding: 10px 16px calc(24px + var(--safe-bottom)); gap: 14px">
-      <span aria-hidden="true" style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--line2)"></span>
-      <span style="display: flex; flex-direction: column; gap: 4px; margin: 0 4px">
-        <h2 class="sheet-title">${title}</h2>
-        ${sub ? html`<span style="font-size: 13px; color: var(--muted)">${sub}</span>` : null}
-      </span>
-      ${content}
+      style="max-height: 80%">
+      <div onPointerDown=${d.onPointerDown} onPointerMove=${d.onPointerMove} onPointerUp=${d.onPointerUp} onPointerCancel=${d.onPointerCancel}
+        style="flex: none; display: flex; flex-direction: column; gap: 14px; padding: 10px 16px 14px; touch-action: none; cursor: grab">
+        <span aria-hidden="true" style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--line2)"></span>
+        <span style="display: flex; flex-direction: column; gap: 4px; margin: 0 4px">
+          <h2 class="sheet-title">${title}</h2>
+          ${sub ? html`<span style="font-size: 13px; color: var(--muted)">${sub}</span>` : null}
+        </span>
+      </div>
+      <div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 16px calc(24px + var(--safe-bottom))">
+        ${content}
+      </div>
     </div>
   </div>`;
 }
