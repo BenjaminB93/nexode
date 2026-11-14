@@ -1,4 +1,5 @@
 import { type Context, Hono } from 'hono';
+import { APP_INFO } from '../app-info.ts';
 import type { Db } from '../db/index.ts';
 import type { Catalog, Push } from '../ports.ts';
 import { ASSIGNABLE_ROLES, usernameKey } from '../domain/accounts.ts';
@@ -35,6 +36,11 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
   };
 
   api.get('/me', (c) => c.json(getSettings(ctxOf(c))));
+
+  api.get('/about', (c) => {
+    ctxOf(c);
+    return c.json(APP_INFO);
+  });
 
   // Champs facultatifs ; tout est validé avant la moindre écriture.
   api.patch('/me', async (c) => {

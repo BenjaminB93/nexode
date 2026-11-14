@@ -1,5 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readAppInfo } from '../src/app-info.ts';
 import { createApp } from '../src/http/app.ts';
 import { addUser, sessionCookie } from './helpers/auth.ts';
 import { type ShowFixture, FakeCatalog, epId, seedShow, testDb } from './helpers/fake-catalog.ts';
@@ -182,6 +187,26 @@ test('corps trop gros → 413', async () => {
   const r = await call('PUT', `/api/watched/${epId(1001, 1, 1)}`, big);
   assert.equal(r.status, 413);
   assert.deepEqual(r.body, { error: 'payload_too_large' });
+});
+
+test('GET /api/about : version et licence de package.json, connexion requise', async () => {
+  const { call, app } = setup();
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const r = await call('GET', '/api/about');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.version, pkg.version);
+  assert.match(r.body.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(r.body.license, 'AGPL-3.0-or-later');
+  assert.equal((await app.request('/api/about')).status, 401);
+});
+
+test('readAppInfo : dépôt normalisé, champs obligatoires', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'nexode-'));
+  const file = (pkg: unknown) => { const p = join(dir, 'package.json'); writeFileSync(p, JSON.stringify(pkg)); return pathToFileURL(p); };
+  assert.deepEqual(readAppInfo(file({ version: '1.2.3', license: 'MIT', repository: { type: 'git', url: 'git+https://github.com/a/b.git' } })),
+    { version: '1.2.3', license: 'MIT', source: 'https://github.com/a/b' });
+  assert.equal(readAppInfo(file({ version: '1.2.3', license: 'MIT' })).source, null);
+  assert.throws(() => readAppInfo(file({ license: 'MIT' })));
 });
 
 test('GET /api/me : forme et valeurs par défaut', async () => {

@@ -1,4 +1,4 @@
-# Séries
+# Nexode
 
 Suivi de séries perso, dans l'esprit de TV Showtime. Node 26 (TypeScript exécuté tel quel, sans build), Hono, SQLite (`node:sqlite`), front statique dans `public/`. Données des séries : TMDB.
 
@@ -99,3 +99,11 @@ docker compose logs caddy        # obtention du certificat, erreurs de connexion
 Docker garde au plus 3 × 10 Mo de journaux par conteneur.
 
 Chaque nuit à 4 h 30 (heure de Paris), l'appli met à jour depuis TMDB les séries suivies ou de côté et purge les sessions expirées ; une ligne « maintenance : … » apparaît dans les journaux. Pour la lancer tout de suite : `docker compose exec app node src/cli/refresh.ts`.
+
+## Versions
+
+Numérotation SemVer, dans `package.json` (affichée dans Profil › À propos et au démarrage dans les journaux). Pour publier une version : changer `version` dans `package.json` et `package-lock.json`, commit « Version x.y.z », puis `git tag -a vx.y.z -m "Version x.y.z"` et `git push pi main --follow-tags`.
+
+## Licence
+
+[GNU AGPL-3.0 ou ultérieure](LICENSE). Une version modifiée mise à disposition d'autres personnes doit leur donner accès à son code source.

@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { APP_INFO } from './app-info.ts';
 import { loadConfig } from './config.ts';
 import { openDb } from './db/index.ts';
 import { migrate } from './db/migrate.ts';
@@ -29,7 +30,7 @@ if (!push) console.warn('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY absentes : notific
 const app = createApp({ db, catalog, push, siteUrl: config.siteUrl, production: config.env === 'production', trustProxy: config.trustProxy });
 
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
-  console.log(`écoute sur http://${info.address}:${info.port} (${config.env})`);
+  console.log(`Nexode ${APP_INFO.version} : écoute sur http://${info.address}:${info.port} (${config.env})`);
 });
 
 const scheduler = createScheduler();

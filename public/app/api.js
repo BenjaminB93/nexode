@@ -149,6 +149,9 @@ export const api = {
     return { text: await res.text(), filename: fileNameFrom(res.headers.get('Content-Disposition'), fallbackName) };
   },
 
+  /** Version, licence et adresse du code source. */
+  about: () => call('GET', '/about'),
+
   // Parrainages (parrain, admin)
   invites: () => call('GET', '/invites'),
   createInvite: () => call('POST', '/invites', {}),

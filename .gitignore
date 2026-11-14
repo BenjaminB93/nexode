@@ -13,8 +13,6 @@ data/
 
 node_modules/
 
-# Prototype construit (node prototype/build.mjs)
-prototype/prototype-series.html
 
 # Variantes locales de .env
 .env.*

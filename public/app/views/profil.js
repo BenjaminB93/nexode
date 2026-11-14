@@ -1,6 +1,6 @@
 // @ts-check
 // Onglet « Profil » : thème (local à l'appareil), pays, mise de côté, notifications (activation par appareil, heure par compte),
-// parrainages et comptes selon le rôle, export des données, déconnexion, suppression du compte.
+// parrainages et comptes selon le rôle, export des données, déconnexion, suppression du compte, « À propos ».
 import { html } from '../../vendor/htm-preact-3.1.1.js';
 import { I } from '../icons.js';
 import { HOURS, THEMES, THRESHOLDS, countryChoices, plural } from '../format.js';
@@ -80,7 +80,9 @@ export function viewProfil(app, st) {
           <button type="button" class="row" style=${dangerRow} onClick=${() => app.logout()}>Se déconnecter</button>
           <button type="button" class="row" style=${dangerRow} onClick=${() => app.askDeleteSelf()}>Supprimer mon compte</button>
         </section>
-        <p style="margin: 0; font-size: 11px; line-height: 1.5; color: var(--faint)">Données et affiches : TMDB. Ce produit utilise l’API TMDB mais n’est ni approuvé ni certifié par TMDB. Plateformes : JustWatch.</p>
+        <section class="group">
+          ${navRow('À propos', null, () => app.openAbout())}
+        </section>
       </div>
     </div>`;
 }
