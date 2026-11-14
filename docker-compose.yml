@@ -1,0 +1,77 @@
+# Appli + Caddy (reverse proxy HTTPS). Sur le Pi : docker compose up -d --build (voir README).
+# .env sert deux fois : env_file de l'appli, et substitution de ${SITE_DOMAIN} ci-dessous (Caddy ne reçoit que ce nom).
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    # Prioritaires sur .env : une copie de .env.example (HOST=127.0.0.1…) ne doit pas casser le conteneur.
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: "1"
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DB_PATH: /data/app.sqlite
+      SITE_URL: "https://${SITE_DOMAIN:?SITE_DOMAIN manquant dans .env}"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    # Aucun port publié : joignable seulement par Caddy, sur le réseau web.
+    networks:
+      - web
+    logging: *logging
+
+  caddy:
+    image: caddy:2.11.9
+    restart: unless-stopped
+    # Non-root, uid sans compte sur le Pi. L'image crée /data/caddy et /config/caddy en 1777 : les volumes nommés restent inscriptibles.
+    user: "10001:10001"
+    # Ports < 1024 ouverts à tout utilisateur dans le réseau du conteneur : aucune capacité nécessaire pour 80/443.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: 0
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: "${SITE_DOMAIN:?SITE_DOMAIN manquant dans .env}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    networks:
+      - web
+    logging: *logging
+
+# Réseau ponté ordinaire : l'appli doit sortir vers api.themoviedb.org (pas de internal: true).
+networks:
+  web: {}
+
+# Certificats et clés ACME : à conserver (les recréer trop souvent bute sur les limites de Let's Encrypt).
+volumes:
+  caddy_data:
+  caddy_config:

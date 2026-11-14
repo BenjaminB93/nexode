@@ -1,0 +1,15 @@
+# Seuls package*.json, src/ et public/ entrent dans l'image (voir Dockerfile) ;
+# cette liste évite surtout d'envoyer secrets et données personnelles au moteur Docker.
+.git
+node_modules
+data
+**/*.sqlite
+**/*.sqlite-*
+**/*.db
+.env
+.env.*
+!.env.example
+import-tv-show
+imports
+prototype
+test

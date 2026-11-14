@@ -1,0 +1,19 @@
+# Reverse proxy devant l'appli. SITE_DOMAIN vient de .env, via docker-compose.yml.
+# Caddy obtient et renouvelle seul le certificat Let's Encrypt de ce nom (ports 80 et 443 joignables depuis Internet)
+# et redirige http:// vers https://.
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		# « ? » = valeur par défaut : l'appli pose déjà no-referrer sur /invitation/* et /reinitialisation/*.
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		# Scripts tous externes ; styles inline (attributs style des vues) ; affiches et logos servis par TMDB.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://image.tmdb.org; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	}
+
+	reverse_proxy app:3000
+}

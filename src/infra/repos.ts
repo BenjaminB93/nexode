@@ -170,6 +170,11 @@ export function useResetToken(db: Db, tokenHash: string, nowIso: string): boolea
     .run(nowIso, tokenHash, nowIso).changes) === 1;
 }
 
+// Liens expirés ou utilisés avant cutoff. Renvoie le nombre de lignes supprimées.
+export function deleteStaleResetTokens(db: Db, cutoffIso: string): number {
+  return Number(db.prepare('DELETE FROM reset_tokens WHERE expires_at <= ? OR used_at <= ?').run(cutoffIso, cutoffIso).changes);
+}
+
 // ---------- export des données ----------
 
 export type ExportShowRow = { showId: number; name: string; state: Follow['state'] };
@@ -304,6 +309,11 @@ export function resumeUserShow(db: Db, userId: number, showId: number, resumedAt
 
 export function deleteUserShow(db: Db, userId: number, showId: number): void {
   db.prepare('DELETE FROM user_shows WHERE user_id = ? AND show_id = ?').run(userId, showId);
+}
+
+// Séries suivies ou de côté par au moins un utilisateur.
+export function listTrackedShowIds(db: Db): number[] {
+  return all<{ showId: number }>(db, 'SELECT DISTINCT show_id AS showId FROM user_shows ORDER BY show_id').map((r) => r.showId);
 }
 
 // ---------- historique de visionnage ----------
