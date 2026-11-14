@@ -15,7 +15,7 @@ export function timeline(ctx: Ctx) {
     today: today(ctx),
     toWatch: buildToWatch(entries).map((x) =>
       ({ show: showRef(x.show), next: episodeView(x.next), upNext: x.upNext.map(episodeView), remaining: x.remaining })),
-    upcoming: buildUpcoming(entries).map((x) => ({ show: showRef(x.show), episode: episodeView(x.episode) })),
+    upcoming: buildUpcoming(entries).map((x) => ({ show: showRef(x.show), episode: episodeView(x.episode), more: x.more })),
   };
 }
 

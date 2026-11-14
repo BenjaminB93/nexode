@@ -47,16 +47,21 @@ test('À regarder : upNext = sortis non vus après next, par saison puis numéro
   assert.deepEqual(last.map((y) => [y.next.number, y.upNext]), [[1, []]]);
 });
 
-test('À venir : 2 prochains épisodes par série suivie hors « de côté », par date', () => {
+test('À venir : épisodes datés des séries suivies hors « de côté », une carte par série et par jour', () => {
   const list = buildUpcoming([
-    entry(1, 'A', ['2026-11-01', '2026-11-20', '2026-11-27', '2026-12-04'], {}, f('2026-11-01T00:00:00Z')),
+    entry(1, 'A', ['2026-11-01', '2026-11-20', '2026-11-27', '2026-11-27', '2026-12-04'], {}, f('2026-11-01T00:00:00Z')),
     entry(2, 'B', ['2026-11-25'], {}, f('2026-11-01T00:00:00Z')),
     entry(3, 'De côté', ['2026-11-01', '2026-11-18'], {}, f('2026-11-01T00:00:00Z', 'shelved')),
     entry(4, 'Pas suivie', ['2026-11-19'], {}, null),
     entry(5, 'À jour', ['2026-11-01', '2026-11-20'], { 1: '2026-11-02T20:00:00Z' }, f('2026-11-01T00:00:00Z')),
   ]);
-  assert.deepEqual(list.map((x) => `${x.show.name}${x.episode.number}@${x.episode.airDate}`),
-    ['A2@2026-11-20', 'À jour2@2026-11-20', 'B1@2026-11-25', 'A3@2026-11-27']);
+  assert.deepEqual(list.map((x) => `${x.show.name}${x.episode.number}+${x.more}@${x.episode.airDate}`),
+    ['A2+0@2026-11-20', 'À jour2+0@2026-11-20', 'B1+0@2026-11-25', 'A3+1@2026-11-27', 'A5+0@2026-12-04']);
+});
+
+test('À venir : au plus perShow épisodes par série', () => {
+  const list = buildUpcoming([entry(1, 'A', ['2026-11-01', '2026-11-20', '2026-11-27', '2026-11-27', '2026-12-04'], {}, f('2026-11-01T00:00:00Z'))], 3);
+  assert.deepEqual(list.map((x) => `${x.episode.number}+${x.more}`), ['2+0', '3+1']);
 });
 
 test('De côté : Pas commencées (même à la main) / Abandonnées, avec le motif', () => {

@@ -49,7 +49,8 @@ export function viewEncours(app, st) {
       <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
         <span class="show-name ell">${u.show.name}</span>
         <span class="ell" style="font-size: 14px; font-weight: 600"><span style="color: var(--accent)">${code(ep.season, ep.number)}</span> <span style="color: ${ep.title ? 'var(--fg)' : 'var(--muted)'}">${epTitle(ep)}</span></span>
-      </span>`;
+      </span>
+      ${u.more ? html`<span class="badge" style="background: var(--accent-bg); color: var(--accent)">+${u.more}</span>` : null}`;
     const style = 'height: 72px; box-sizing: border-box; border-radius: 14px; border: 1px solid var(--cardline); background: transparent; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; text-align: left; color: inherit; font: inherit';
     return interactive
       ? html`<button type="button" key=${ep.id} onClick=${app.tap(() => app.openEp(u.show, ep))} style="${style}; cursor: pointer">${inner}</button>`

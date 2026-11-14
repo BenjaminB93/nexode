@@ -20,13 +20,21 @@ export function buildToWatch<S extends { id: number; name: string }, E extends E
     .sort((a, b) => cmp(a.next.airDate, b.next.airDate) || byName(a.show, b.show));
 }
 
-// À venir : les 2 prochains épisodes de chaque série suivie qui n'est pas de côté, par date de sortie.
-export function buildUpcoming<S extends { id: number; name: string }, E extends EpisodeLike>(entries: readonly ShowEntry<S, E>[], perShow = 2) {
+// À venir : épisodes datés des séries suivies hors « de côté » (perShow au plus par série), par date de sortie.
+// Une carte par série et par jour : episode = le premier du jour, more = les autres épisodes sortant ce jour-là.
+export function buildUpcoming<S extends { id: number; name: string }, E extends EpisodeLike>(entries: readonly ShowEntry<S, E>[], perShow = 50) {
   return entries
     .filter((x) => x.follow && x.info.status !== 'decote')
-    .flatMap((x) => x.info.future.slice(0, perShow).map((episode) => ({ show: x.show, episode })))
-    .sort((a, b) => cmp(a.episode.airDate, b.episode.airDate) || byName(a.show, b.show)
-      || a.episode.season - b.episode.season || a.episode.number - b.episode.number);
+    .flatMap((x) => {
+      const cards: { show: S; episode: E; more: number }[] = [];
+      for (const episode of x.info.future.slice(0, perShow)) {
+        const last = cards.at(-1);
+        if (last && last.episode.airDate === episode.airDate) last.more++;
+        else cards.push({ show: x.show, episode, more: 0 });
+      }
+      return cards;
+    })
+    .sort((a, b) => cmp(a.episode.airDate, b.episode.airDate) || byName(a.show, b.show));
 }
 
 // Motif affiché sur une carte « De côté ».
