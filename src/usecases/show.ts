@@ -1,5 +1,5 @@
 import { localDate } from '../domain/dates.ts';
-import { type ProviderItem, providerGroups } from '../domain/providers.ts';
+import { type ProviderItem, type SeasonProviders, providerGroups, withShowFallback } from '../domain/providers.ts';
 import { isAired } from '../domain/series.ts';
 import { type ProviderRow, getProviders, getSeasonEpisodes, getSeasons } from '../infra/repos.ts';
 import { type Ctx, NotFoundError, today } from './context.ts';
@@ -17,6 +17,12 @@ async function ensureProvidersCached(ctx: Ctx, showId: number): Promise<void> {
 const providerItem = (p: ProviderRow): ProviderItem => ({ id: p.id, name: p.name, logoPath: p.logoPath });
 
 // Fiche série : méta, relation, saisons (vus / sortis / total), plateformes du pays de l'utilisateur.
+// Plateformes par saison, avec repli sur le relevé de la série (saison 0) quand aucune saison n'est renseignée.
+function seasonProviders(rows: readonly ProviderRow[], numbers: readonly number[]): SeasonProviders[] {
+  const of = (season: number) => rows.filter((p) => p.season === season).map(providerItem);
+  return withShowFallback(numbers.map((n) => ({ season: n, items: of(n) })), of(0));
+}
+
 export async function showDetail(ctx: Ctx, showId: number) {
   await ensureShowCached(ctx, showId);
   await ensureProvidersCached(ctx, showId);
@@ -47,10 +53,7 @@ export async function showDetail(ctx: Ctx, showId: number) {
     }),
     providers: {
       country: ctx.user.country,
-      groups: providerGroups(seasons.map((se) => ({
-        season: se.number,
-        items: providers.filter((p) => p.season === se.number).map(providerItem),
-      }))),
+      groups: providerGroups(seasonProviders(providers, seasons.map((se) => se.number))),
     },
   };
 }
@@ -86,7 +89,8 @@ export async function seasonDetail(ctx: Ctx, showId: number, number: number) {
       aired: eps.filter((e) => isAired(e, day)).length,
       seen: eps.filter((e) => watched.has(e.id)).length,
     },
-    providers: getProviders(ctx.db, showId, ctx.user.country).filter((p) => p.season === number).map(providerItem),
+    providers: seasonProviders(getProviders(ctx.db, showId, ctx.user.country), getSeasons(ctx.db, showId).map((se) => se.number))
+      .find((s) => s.season === number)?.items ?? [],
     episodes: eps.map((e) => {
       const at = watched.get(e.id) ?? null;
       return {

@@ -98,6 +98,8 @@ export function pickProviders(res: TmdbProviders, country: string): { provider_i
   return [...out.values()].sort((a, b) => a.priority - b.priority);
 }
 
+export const SHOW_LEVEL = 0;
+
 export function createCatalog({ db, tmdb, now = () => new Date(), warn = console.warn }: CatalogDeps): Catalog {
   const inflight = new Map<number, Promise<void>>();
   const isFresh = (iso: string | undefined) => iso !== undefined && now().getTime() - Date.parse(iso) < DAY_MS;
@@ -280,7 +282,9 @@ export function createCatalog({ db, tmdb, now = () => new Date(), warn = console
   async function ensureProviders(showId: number, country: string): Promise<void> {
     await ensureShow(showId);
     const cc = country.toUpperCase();
-    const seasons = db.prepare('SELECT number FROM seasons WHERE show_id = ? ORDER BY number').all(showId) as { number: number }[];
+    // Saison 0 = relevé au niveau de la série (TMDB /tv/{id}/watch/providers) : certaines plateformes (Disney+ en France)
+    // n'y figurent qu'à ce niveau, sans détail par saison.
+    const seasons = [{ number: SHOW_LEVEL }, ...(db.prepare('SELECT number FROM seasons WHERE show_id = ? ORDER BY number').all(showId) as { number: number }[])];
     const fetchedAt = db.prepare('SELECT fetched_at FROM provider_fetches WHERE show_id = ? AND season = ? AND country = ?');
 
     const fetched: { season: number; list: ReturnType<typeof pickProviders> }[] = [];
@@ -290,7 +294,7 @@ export function createCatalog({ db, tmdb, now = () => new Date(), warn = console
       if (isFresh(row?.fetched_at) || coolingDown(key)) continue;
       let res: TmdbProviders;
       try {
-        res = await tmdb.get<TmdbProviders>(`/tv/${showId}/season/${number}/watch/providers`);
+        res = await tmdb.get<TmdbProviders>(number === SHOW_LEVEL ? `/tv/${showId}/watch/providers` : `/tv/${showId}/season/${number}/watch/providers`);
       } catch (err) {
         if (!isNotFound(err)) {
           failed(key, `relevé des plateformes (série ${showId}, saison ${number}, ${cc})`, err);

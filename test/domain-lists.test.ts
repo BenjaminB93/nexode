@@ -92,3 +92,14 @@ test('providerGroups : saisons consécutives identiques fusionnées, libellés s
     [['Saison 1', [1, 2]], ['Saisons 2–3', [2]], ['Saison 5', [2]]]);
   assert.deepEqual(providerGroups([{ season: 1, items: [] }]), []);
 });
+
+test('plateformes : repli sur la série quand aucune saison n\'est renseignée (Disney+ en France), pas sinon', async () => {
+  const { withShowFallback, providerGroups } = await import('../src/domain/providers.ts');
+  const disney = [{ id: 337, name: 'Disney Plus', logoPath: null }];
+  const empty = [{ season: 1, items: [] }, { season: 2, items: [] }];
+  assert.deepEqual(providerGroups(withShowFallback(empty, disney)), [{ from: 1, to: 2, label: null, items: disney }]);
+  const apple = [{ id: 350, name: 'Apple TV', logoPath: null }];
+  const partial = [{ season: 1, items: apple }, { season: 2, items: [] }];
+  assert.deepEqual(withShowFallback(partial, disney), partial, 'saison 2 pas encore sortie : reste vide');
+  assert.deepEqual(withShowFallback(empty, []), empty);
+});

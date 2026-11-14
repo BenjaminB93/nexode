@@ -4,6 +4,13 @@ export type ProviderItem = { id: number; name: string; logoPath: string | null }
 export type SeasonProviders = { season: number; items: readonly ProviderItem[] };   // items triés par priorité
 export type ProviderGroup = { from: number; to: number; label: string | null; items: ProviderItem[] };
 
+// Aucune saison renseignée mais la série l'est (Disney+ en France) : chaque saison reçoit les plateformes de la série.
+// Si une saison au moins est renseignée, les saisons vides le restent (souvent une saison pas encore sortie).
+export function withShowFallback(seasons: readonly SeasonProviders[], show: readonly ProviderItem[]): SeasonProviders[] {
+  if (!show.length || seasons.some((s) => s.items.length)) return [...seasons];
+  return seasons.map((s) => ({ season: s.season, items: show }));
+}
+
 // Libellé (« Saison 1 », « Saisons 2–3 ») seulement s'il y a plusieurs groupes. Une saison sans plateforme coupe le groupe.
 export function providerGroups(seasons: readonly SeasonProviders[]): ProviderGroup[] {
   const groups: { sig: string; from: number; to: number; items: ProviderItem[] }[] = [];

@@ -205,7 +205,7 @@ test('plateformes : abonnement seulement, variantes exclues, cache 24 h', async 
     { season: 1, country: 'FR', provider_id: 2303, name: 'Paramount Plus Premium', priority: 78 },
   ]);
   assert.equal(t.one("SELECT count(*) n FROM providers WHERE name LIKE '%channel%'").n, 0);
-  assert.equal(t.one('SELECT count(*) n FROM provider_fetches WHERE show_id = ?', TULSA).n, 4);
+  assert.equal(t.one('SELECT count(*) n FROM provider_fetches WHERE show_id = ?', TULSA).n, 5, '4 saisons + la série (saison 0)');
 
   const before = t.tmdb.calls();
   await t.catalog.ensureProviders(TULSA, 'FR');
@@ -215,7 +215,7 @@ test('plateformes : abonnement seulement, variantes exclues, cache 24 h', async 
 test('plateformes : liste vide enregistrée, remplacement complet après 24 h', async () => {
   const t = setup();
   await t.catalog.ensureProviders(TLOU, 'DE');
-  assert.equal(t.one("SELECT count(*) n FROM provider_fetches WHERE country = 'DE'").n, 2);
+  assert.equal(t.one("SELECT count(*) n FROM provider_fetches WHERE country = 'DE'").n, 3);
   assert.equal(t.one('SELECT count(*) n FROM providers').n, 0);
 
   await t.catalog.ensureProviders(TLOU, 'FR');
@@ -229,7 +229,7 @@ test('plateformes : liste vide enregistrée, remplacement complet après 24 h', 
   t.advance(25 * HOUR);
   const before = t.tmdb.calls();
   await t.catalog.ensureProviders(TLOU, 'FR');
-  assert.equal(t.tmdb.calls() - before, 4); // série (2) + plateformes (2)
+  assert.equal(t.tmdb.calls() - before, 5); // série (2) + plateformes (série + 2 saisons)
   assert.equal(t.one("SELECT count(*) n FROM providers WHERE country = 'FR'").n, 0);
   assert.equal(t.one("SELECT fetched_at FROM provider_fetches WHERE country = 'FR' AND season = 1").fetched_at, '2026-11-15T11:00:00.000Z');
 });
@@ -308,21 +308,21 @@ test('TMDB en panne : série en cache servie périmée, pas de nouvel appel pend
   await t.catalog.ensureProviders(TLOU, 'FR');
   const providers = t.all('SELECT season, name FROM providers ORDER BY season');
   t.advance(25 * HOUR);
-  for (const key of [TLOU_SHOW, '/tv/100088/season/1/watch/providers', '/tv/100088/season/2/watch/providers']) {
+  for (const key of [TLOU_SHOW, '/tv/100088/watch/providers', '/tv/100088/season/1/watch/providers', '/tv/100088/season/2/watch/providers']) {
     t.routes.set(key, () => ({ status: 503 }));
   }
 
   const before = t.tmdb.calls();
   await t.catalog.ensureProviders(TLOU, 'FR');
-  assert.equal(t.tmdb.calls() - before, 12); // série + 2 saisons, 4 essais chacune
+  assert.equal(t.tmdb.calls() - before, 16); // série, plateformes de la série + 2 saisons, 4 essais chacun
   assert.equal(t.one('SELECT refreshed_at FROM shows').refreshed_at, '2026-11-14T10:00:00.000Z');
   assert.deepEqual(t.all('SELECT season, name FROM providers ORDER BY season'), providers);
-  assert.equal(t.warnings.length, 3);
+  assert.equal(t.warnings.length, 4);
   assert.ok(t.warnings.every((w) => !w.includes('jeton-test')));
 
   await t.catalog.ensureShow(TLOU);
   await t.catalog.ensureProviders(TLOU, 'FR');
-  assert.equal(t.tmdb.calls() - before, 12);
+  assert.equal(t.tmdb.calls() - before, 16);
 
   t.advance(16 * 60 * 1000);
   t.routes.set(TLOU_SHOW, loadFixtures().get(TLOU_SHOW));
