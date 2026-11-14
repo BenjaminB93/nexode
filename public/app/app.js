@@ -103,6 +103,11 @@ const emptyImport = () => ({ files: null, step: 'pick', analysis: null, choices:
 /** @returns {Form} */
 const emptyForm = () => ({ name: '', pw: '', show: false, busy: false, error: null, bad: null });
 
+/** Feuilles et confirmations affichées par-dessus l'écran : toutes fermées. */
+const NO_OVERLAY = { picker: null, confirm: null, linkSheet: null, account: null, exportSheet: null, delSelf: null };
+/** @param {State} s */
+const hasOverlay = (s) => Object.keys(NO_OVERLAY).some((k) => /** @type {any} */ (s)[k] != null);
+
 /** État d'une session neuve (démarrage, connexion, déconnexion) : rien du compte précédent ne reste. @param {string} theme @returns {State} */
 function initialState(theme) {
   return {
@@ -196,6 +201,8 @@ export class App extends Component {
     this.onWheel = (/** @type {WheelEvent} */ ev) => this.handleWheel(ev);
     this.onPop = (/** @type {PopStateEvent} */ ev) => this.handlePop(ev);
     this.onSearchInput = (/** @type {Event} */ ev) => this.searchInput(/** @type {HTMLInputElement} */ (ev.currentTarget).value);
+    /** L'entrée d'historique de la feuille ouverte est en place. */
+    this.sheetEntry = false;
     this.closePicker = () => this.setState({ picker: null });
     this.closeConfirm = () => this.setState({ confirm: null });
   }
@@ -221,8 +228,9 @@ export class App extends Component {
     // Chaque vue ouverte dans l'explorateur = une entrée d'historique : le retour système (Android, geste)
     // fait la même chose que la flèche « retour » de l'appli.
     // Rechargé depuis une vue de l'explorateur : la pile repart vide, on revient d'abord à l'entrée de base (nav 0).
+    // Une feuille ouverte a aussi son entrée ({ nav, sheet: true }) : le retour système la ferme.
     try {
-      const nav = history.state && typeof history.state.nav === 'number' ? history.state.nav : 0;
+      const nav = history.state && typeof history.state.nav === 'number' ? history.state.nav + (history.state.sheet ? 1 : 0) : 0;
       if (nav > 0) history.go(-nav);
       else history.replaceState({ nav: 0 }, '');
       this.useHistory = true;
@@ -257,6 +265,26 @@ export class App extends Component {
     this.placeScroll();
     this.maybeLoadOlder();
     this.ensureTop();
+    this.syncSheetEntry();
+  }
+
+  /** Feuille ouverte → une entrée d'historique ; fermée par l'appli (fond, glissement, choix) → l'entrée est retirée. */
+  syncSheetEntry() {
+    if (!this.useHistory) return;
+    const open = hasOverlay(this.state);
+    if (open && !this.sheetEntry) {
+      try { history.pushState({ nav: this.state.stack.length, sheet: true }, ''); this.sheetEntry = true; } catch { /* retour système sans effet sur la feuille */ }
+    } else if (!open && this.sheetEntry) {
+      this.sheetEntry = false;
+      history.back();
+    }
+  }
+
+  /** Entrées d'historique au-dessus de l'entrée de base (vues de l'explorateur + feuille), à retirer d'un coup. */
+  dropHistoryEntries() {
+    const n = this.state.stack.length + (this.sheetEntry ? 1 : 0);
+    this.sheetEntry = false;
+    if (this.useHistory && n) history.go(-n);
   }
 
   // ---------- utilitaires d'état ----------
@@ -739,8 +767,8 @@ export class App extends Component {
     this.g = null;
     this.loggingOut = false;
     this.revoking = false;
-    // Vues de l'explorateur ouvertes : leurs entrées d'historique sont retirées (le popstate trouvera une pile vide).
-    if (this.useHistory && this.state.stack.length) history.go(-this.state.stack.length);
+    // Vues de l'explorateur et feuille ouvertes : leurs entrées d'historique sont retirées (le popstate trouvera une pile vide).
+    this.dropHistoryEntries();
     this.setState({ ...initialState(this.state.theme), auth });
   }
 
@@ -1182,7 +1210,7 @@ export class App extends Component {
   /** @param {string} t */
   goTab(t) {
     // Les vues d'explorateur ouvertes sont abandonnées : on retire aussi leurs entrées d'historique.
-    if (this.useHistory && this.state.stack.length) history.go(-this.state.stack.length);
+    this.dropHistoryEntries();
     if (t === 'encours') { this.pendingScroll = 'anchor'; this.setPull(0, false); }
     this.touched = false;
     this.scrollMemo.clear();
@@ -1191,7 +1219,7 @@ export class App extends Component {
     // réaffichées en attendant (elles seraient remplacées et réordonnées sous les yeux à l'arrivée de la réponse).
     /** @type {Partial<State>} */
     const reset = t === 'encours' ? { tl: null, hist: null, upcomingOpen: false } : t === 'decote' ? { shelf: null } : {};
-    this.setState({ tab: t, stack: [], picker: null, confirm: null, ...reset });
+    this.setState({ tab: t, stack: [], ...NO_OVERLAY, ...reset });
     this.loadTab(t);
   }
 
@@ -1204,7 +1232,13 @@ export class App extends Component {
     this.saveScroll();
     this.rememberScroll();
     const stack = this.state.stack.concat([view]);
-    if (this.useHistory) { try { history.pushState({ nav: stack.length }, ''); } catch { this.useHistory = false; } }
+    // Vue ouverte depuis une feuille (qui se ferme) : l'entrée de la feuille devient celle de la vue.
+    if (this.useHistory) {
+      try {
+        if (this.sheetEntry) { this.sheetEntry = false; history.replaceState({ nav: stack.length }, ''); }
+        else history.pushState({ nav: stack.length }, '');
+      } catch { this.useHistory = false; }
+    }
     this.setState({ stack });
   }
   /** @param {View} a @param {View} b */
@@ -1225,6 +1259,10 @@ export class App extends Component {
   }
   /** @param {PopStateEvent} ev */
   handlePop(ev) {
+    // Retour système feuille ouverte : il ferme la feuille, l'écran dessous ne bouge pas.
+    if (this.sheetEntry) { this.sheetEntry = false; this.setState(NO_OVERLAY); return; }
+    // « Suivant » du navigateur vers l'entrée d'une feuille déjà fermée : on la ressaute.
+    if (ev.state && ev.state.sheet) { history.back(); return; }
     const nav = ev.state && typeof ev.state.nav === 'number' ? ev.state.nav : 0;
     // Entrée plus profonde que la pile (« suivant » du navigateur, entrées laissées par un rechargement) :
     // on revient à l'entrée qui correspond à la pile, sinon les retours suivants ne feraient rien.
