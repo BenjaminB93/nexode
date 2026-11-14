@@ -14,8 +14,8 @@ export type Session = { user: User; token: string };
 export type AuthEnv = { Variables: { session: Session | null } };
 
 export type Limits = {
-  loginUser: FailureLimiter;   // échecs de connexion par nom (et mauvais mot de passe à la suppression du compte)
-  loginIp: FailureLimiter;     // échecs de connexion par adresse
+  loginUser: FailureLimiter;   // verrou du compte : 5 s après chaque échec (connexion, ressaisie à la suppression du compte)
+  loginIp: FailureLimiter;     // échecs de connexion par adresse, tous comptes confondus : 10 en 15 min
   tokenIp: FailureLimiter;     // codes d'invitation et liens de réinitialisation invalides, par adresse
 };
 

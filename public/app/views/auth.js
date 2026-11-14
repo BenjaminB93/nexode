@@ -56,7 +56,7 @@ export function viewAuth(app, st) {
     ok = !!name && !!f.pw;
     label = 'Se connecter';
   }
-  const enabled = ok && !f.busy;
+  const enabled = ok && !f.busy && !f.wait;
   return html`<div class="screen v-fwd" style="overflow-y: auto">
     <form onSubmit=${(/** @type {Event} */ ev) => { ev.preventDefault(); if (enabled) app.submitAuth(); }} style="max-width: 380px; margin: 0 auto; padding: 56px 24px 32px; display: flex; flex-direction: column; gap: 18px">
       <span style="display: flex; align-items: center; gap: 10px; color: var(--accent); font: 700 15px var(--display)">${I.tv()}Suivi de séries</span>
@@ -66,7 +66,7 @@ export function viewAuth(app, st) {
       </span>
       ${body}
       ${a.screen === 'invalid' ? null : formError(error)}
-      <button type="submit" class="btn btn-primary press" disabled=${!enabled} style="margin-top: 6px; opacity: ${ok ? 1 : 0.45}">${label}</button>
+      <button type="submit" class="btn btn-primary press" disabled=${!enabled} style="margin-top: 6px; opacity: ${ok && !f.wait ? 1 : 0.45}">${label}</button>
     </form>
   </div>`;
 }

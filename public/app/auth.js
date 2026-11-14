@@ -47,8 +47,8 @@ export function passwordOk(pw) {
 
 /** @param {number | undefined} seconds */
 function waitText(seconds) {
-  const m = Math.max(1, Math.ceil((seconds || 60) / 60));
-  return m + ' min';
+  const s = Math.max(1, Math.ceil(seconds || 60));
+  return s < 60 ? s + ' s' : Math.ceil(s / 60) + ' min';
 }
 
 /**

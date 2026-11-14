@@ -11,7 +11,7 @@ import { HashBusyError } from '../infra/secrets.ts';
 import { AppError, UpstreamError } from '../usecases/context.ts';
 import { createApi } from './api.ts';
 import { type AuthEnv, type Limits, createAuthRoutes, sessionMiddleware } from './auth.ts';
-import { FailureLimiter, TooManyAttemptsError } from './rate-limit.ts';
+import { FailureLimiter, TooManyAttemptsError, loginLimits } from './rate-limit.ts';
 import { MAX_BODY_BYTES } from './validate.ts';
 
 export const PUBLIC_DIR = join(import.meta.dirname, '..', '..', 'public');
@@ -63,7 +63,7 @@ export function createApp(deps: AppDeps): Hono {
     now,
     secureCookie,
     trustProxy: deps.trustProxy ?? false,
-    limits: deps.limits ?? { loginUser: new FailureLimiter(), loginIp: new FailureLimiter(), tokenIp: new FailureLimiter() },
+    limits: deps.limits ?? { ...loginLimits(), tokenIp: new FailureLimiter() },
   };
 
   // CSRF : une écriture venant d'une autre origine est refusée (en plus du JSON obligatoire et de SameSite=Lax).

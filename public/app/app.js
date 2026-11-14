@@ -58,7 +58,7 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
 /**
  * Page hors appli. info : réponse de la lecture du lien (invitation, réinitialisation).
  * @typedef {{ screen: 'login' | 'signup' | 'reset' | 'invalid', code?: string, token?: string, info?: any, infoFailed?: boolean }} Auth
- * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null }} Form
+ * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null, wait?: boolean }} Form
  * Feuille « Supprimer mon compte » ; bad : champ refusé par le serveur (seul le mot de passe peut l'être).
  * @typedef {Omit<Form, 'name'>} DelSelf
  */
@@ -768,7 +768,15 @@ export class App extends Component {
     }, (e) => {
       if (seq !== this.authSeq || !this.state.auth) return;
       if (e && (e.code === 'invite_invalid' || e.code === 'reset_invalid')) this.setState((/** @type {State} */ s) => ({ auth: { ...(s.auth || a), screen: 'invalid' }, form: emptyForm() }));
-      else this.setForm({ busy: false, error: authErrorText(e), bad: authErrorField(e) });
+      else {
+        // Compte verrouillé 5 s après un échec (ou attente imposée) : bouton grisé pendant ce temps.
+        const wait = e && e.code === 'invalid_credentials' ? 5 : e && e.code === 'too_many_attempts' ? (e.retryAfter || 5) : 0;
+        this.setForm({ busy: false, error: authErrorText(e), bad: authErrorField(e), wait: wait > 0 });
+        if (wait > 0) {
+          clearTimeout(this.authWaitTimer);
+          this.authWaitTimer = setTimeout(() => this.setForm({ wait: false }), wait * 1000);
+        }
+      }
     });
   }
 

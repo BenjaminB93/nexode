@@ -12,6 +12,10 @@ export class TooManyAttemptsError extends AppError {
   }
 }
 
+// Réglages de la connexion. Une tentative refusée (compte verrouillé, adresse bloquée) n'est pas évaluée et ne compte pas :
+// une adresse bloquée ne peut donc pas prolonger le verrou d'un compte.
+export const loginLimits = () => ({ loginUser: new FailureLimiter(1, 5_000), loginIp: new FailureLimiter(10, 15 * 60_000) });
+
 // max échecs dans une fenêtre glissante de windowMs. Les instants sont en ms (horloge injectable pour les tests).
 export class FailureLimiter {
   readonly max: number;

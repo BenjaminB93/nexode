@@ -117,6 +117,7 @@ test('connexion refusée : même 401 si le compte n\'existe pas ; compte sans mo
     assert.equal(r.status, 401, JSON.stringify(body));
     assert.deepEqual(r.body, { error: 'invalid_credentials' });
     assert.equal(r.cookies.length, 0);
+    s.advance(5_000);   // verrou du compte après un échec
   }
   assert.deepEqual((await s.req('POST', '/api/auth/login', { body: { username: 'camille' } })).body, { error: 'invalid_input', field: 'password' });
   assert.deepEqual((await s.req('POST', '/api/auth/login', { body: { username: 1, password: PW } })).body, { error: 'invalid_input', field: 'username' });
@@ -453,6 +454,7 @@ test('réinitialisation : lien 24 h à usage unique, sessions fermées, nouveau 
   assert.equal((await s.req('GET', '/api/me', { cookie: admin.cookie })).status, 200, 'les autres comptes gardent leur session');
 
   assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'lea', password: PW } })).status, 401);
+  s.advance(5_000);
   assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'lea', password: 'nouveau mot de passe' } })).status, 200);
   // Usage unique.
   assert.deepEqual((await s.req('GET', `/api/auth/reset/${token}`)).body, { error: 'reset_invalid' });
@@ -499,6 +501,7 @@ test('supprimer mon compte : mot de passe exigé, effacement réel, invités con
   const wrong = await s.req('DELETE', '/api/me', { cookie: julie.cookie, body: { password: 'pas le bon' } });
   assert.deepEqual([wrong.status, wrong.body], [403, { error: 'wrong_password' }]);
   assert.equal((await s.req('DELETE', '/api/me', { cookie: julie.cookie })).status, 400);
+  s.advance(5_000);
 
   const r = await s.req('DELETE', '/api/me', { cookie: julie.cookie, body: { password: PW } });
   assert.equal(r.status, 204);
@@ -596,27 +599,42 @@ test('export : fichier JSON en pièce jointe, ids TMDB, épisodes triés par dat
 
 // ---------- limitation des tentatives ----------
 
-test('limitation : 5 échecs en 15 min par nom → 429 { retryAfter }, même avec le bon mot de passe ; un succès remet le compteur à zéro', async () => {
+test('verrou du compte : 5 s après un échec, même avec le bon mot de passe et depuis une autre adresse', async () => {
   const s = setup();
   s.user('camille');
   const login = (password: string, ip: string) => s.req('POST', '/api/auth/login', { body: { username: 'Camille', password }, ip });
-  for (let i = 0; i < 4; i++) assert.equal((await login('faux', `10.0.0.${i}`)).status, 401);
-  assert.equal((await login(PW, '10.0.1.1')).status, 200, 'succès : compteur du nom remis à zéro');
-  for (let i = 0; i < 5; i++) assert.equal((await login('faux', `10.0.2.${i}`)).status, 401);
-  const blocked = await login(PW, '10.0.3.1');
+  assert.equal((await login(PW, '10.0.0.1')).status, 200, 'bon mot de passe : connexion immédiate');
+  assert.equal((await login('faux', '10.0.0.2')).status, 401);
+  const blocked = await login(PW, '10.0.0.3');
+  assert.deepEqual([blocked.status, blocked.body], [429, { error: 'too_many_attempts', retryAfter: 5 }]);
+  assert.equal(blocked.headers.get('retry-after'), '5');
+  s.advance(3_000);
+  assert.equal((await login(PW, '10.0.0.3')).body.retryAfter, 2, 'une tentative refusée ne prolonge pas le verrou');
+  s.advance(2_000);
+  assert.equal((await login(PW, '10.0.0.3')).status, 200);
+});
+
+test('adresse bloquée : 10 échecs en 15 min tous comptes confondus ; ses tentatives ne verrouillent plus aucun compte', async () => {
+  const s = setup();
+  s.user('victime');
+  const ip = '198.51.100.7';
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await s.req('POST', '/api/auth/login', { body: { username: i % 2 ? 'victime' : 'nom' + i, password: 'faux' }, ip })).status, 401);
+    s.advance(5_000);
+  }
+  const blocked = await s.req('POST', '/api/auth/login', { body: { username: 'victime', password: 'faux' }, ip });
   assert.equal(blocked.status, 429);
-  assert.deepEqual(blocked.body, { error: 'too_many_attempts', retryAfter: 900 });
-  assert.equal(blocked.headers.get('retry-after'), '900');
-  s.advance(10 * 60_000);
-  assert.equal((await login(PW, '10.0.3.1')).body.retryAfter, 300);
-  s.advance(5 * 60_000);
-  assert.equal((await login(PW, '10.0.3.1')).status, 200);
+  assert.ok(blocked.body.retryAfter > 800, 'bloquée environ 15 min');
+  // La victime se connecte aussitôt depuis son adresse : l'adresse bloquée n'a pas reverrouillé le compte.
+  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'victime', password: PW }, ip: '203.0.113.1' })).status, 200);
+  s.advance(15 * 60_000);
+  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'autre', password: 'faux' }, ip })).status, 401, 'débloquée après 15 min');
 });
 
 test('limitation par adresse : socket par défaut ; X-Forwarded-For (dernière valeur) seulement avec TRUST_PROXY', async () => {
   const direct = setup();
-  for (let i = 0; i < 5; i++) {
-    const r = await direct.req('POST', '/api/auth/login', { body: { username: `nom${i}`, password: 'x' }, ip: '192.0.2.1', headers: { 'x-forwarded-for': `198.51.100.${i}` } });
+  for (let i = 0; i < 10; i++) {
+    const r = await direct.req('POST', '/api/auth/login', { body: { username: 'nom' + i, password: 'x' }, ip: '192.0.2.1', headers: { 'x-forwarded-for': '198.51.100.' + i } });
     assert.equal(r.status, 401);
   }
   assert.equal((await direct.req('POST', '/api/auth/login', { body: { username: 'autre', password: 'x' }, ip: '192.0.2.1', headers: { 'x-forwarded-for': '203.0.113.9' } })).status, 429,
@@ -624,8 +642,9 @@ test('limitation par adresse : socket par défaut ; X-Forwarded-For (dernière v
   assert.equal((await direct.req('POST', '/api/auth/login', { body: { username: 'autre', password: 'x' }, ip: '192.0.2.2' })).status, 401);
 
   const proxied = setup({ trustProxy: true });
-  const fail = (xff: string) => proxied.req('POST', '/api/auth/login', { body: { username: `n${Math.random()}`.slice(0, 10), password: 'x' }, ip: '172.18.0.2', headers: { 'x-forwarded-for': xff } });
-  for (let i = 0; i < 5; i++) assert.equal((await fail(`1.2.3.${i}, 203.0.113.7`)).status, 401);
+  let n = 0;
+  const fail = (xff: string) => proxied.req('POST', '/api/auth/login', { body: { username: 'n' + n++, password: 'x' }, ip: '172.18.0.2', headers: { 'x-forwarded-for': xff } });
+  for (let i = 0; i < 10; i++) assert.equal((await fail('1.2.3.' + i + ', 203.0.113.7')).status, 401);
   assert.equal((await fail('9.9.9.9, 203.0.113.7')).status, 429, 'clé = dernière valeur');
   assert.equal((await fail('203.0.113.7, 203.0.113.8')).status, 401, 'autre client derrière le même proxy');
 });
@@ -633,25 +652,28 @@ test('limitation par adresse : socket par défaut ; X-Forwarded-For (dernière v
 test('limitation des codes : invitations et réinitialisations invalides, par adresse', async () => {
   const s = setup();
   const ip = '192.0.2.10';
-  for (let i = 0; i < 3; i++) assert.equal((await s.req('GET', `/api/auth/invite/${'a'.repeat(22)}`, { ip })).status, 404);
-  assert.equal((await s.req('POST', '/api/auth/signup', { body: { code: 'b'.repeat(22), username: 'abc', password: PW }, ip })).status, 404);
-  assert.equal((await s.req('GET', `/api/auth/reset/${'c'.repeat(22)}`, { ip })).status, 404);
+  const A = 'a'.repeat(22), B = 'b'.repeat(22), C = 'c'.repeat(22);
+  for (let i = 0; i < 3; i++) assert.equal((await s.req('GET', '/api/auth/invite/' + A, { ip })).status, 404);
+  assert.equal((await s.req('POST', '/api/auth/signup', { body: { code: B, username: 'abc', password: PW }, ip })).status, 404);
+  assert.equal((await s.req('GET', '/api/auth/reset/' + C, { ip })).status, 404);
   for (const r of [
-    await s.req('GET', `/api/auth/invite/${'a'.repeat(22)}`, { ip }),
-    await s.req('POST', '/api/auth/signup', { body: { code: 'b'.repeat(22), username: 'abc', password: PW }, ip }),
-    await s.req('GET', `/api/auth/reset/${'c'.repeat(22)}`, { ip }),
-    await s.req('POST', '/api/auth/reset', { body: { token: 'c'.repeat(22), password: PW }, ip }),
+    await s.req('GET', '/api/auth/invite/' + A, { ip }),
+    await s.req('POST', '/api/auth/signup', { body: { code: B, username: 'abc', password: PW }, ip }),
+    await s.req('GET', '/api/auth/reset/' + C, { ip }),
+    await s.req('POST', '/api/auth/reset', { body: { token: C, password: PW }, ip }),
   ]) assert.deepEqual([r.status, r.body.error], [429, 'too_many_attempts']);
-  assert.equal((await s.req('GET', `/api/auth/reset/${'c'.repeat(22)}`, { ip: '192.0.2.11' })).status, 404);
+  assert.equal((await s.req('GET', '/api/auth/reset/' + C, { ip: '192.0.2.11' })).status, 404);
 });
 
-test('limitation : supprimer mon compte avec un mauvais mot de passe compte comme un échec de connexion', async () => {
+test('supprimer mon compte avec un mauvais mot de passe verrouille le compte 5 s', async () => {
   const s = setup();
   const u = s.user('julie');
   s.user('autre', 'admin');
-  for (let i = 0; i < 5; i++) assert.equal((await s.req('DELETE', '/api/me', { cookie: u.cookie, body: { password: 'faux' } })).status, 403);
+  assert.equal((await s.req('DELETE', '/api/me', { cookie: u.cookie, body: { password: 'faux' } })).status, 403);
   assert.equal((await s.req('DELETE', '/api/me', { cookie: u.cookie, body: { password: PW } })).status, 429);
   assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'julie', password: PW } })).status, 429);
+  s.advance(5_000);
+  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'julie', password: PW } })).status, 200);
 });
 
 test('FailureLimiter : fenêtre glissante, purge des entrées expirées', () => {
@@ -674,34 +696,33 @@ test('FailureLimiter : fenêtre glissante, purge des entrées expirées', () => 
   assert.equal(l.size, 0);
 });
 
-test('limitation : des tentatives simultanées ne passent pas toutes (échec compté avant le scrypt)', async () => {
+test('tentatives simultanées : une seule évaluée par compte, 10 par adresse (échec compté avant le scrypt)', async () => {
   const s = setup();
   s.user('victime');
   const statuses = async (rs: Promise<{ status: number }>[]) => (await Promise.all(rs)).map((r) => r.status);
   const tally = (xs: number[]) => xs.reduce<Record<number, number>>((acc, x) => ({ ...acc, [x]: (acc[x] ?? 0) + 1 }), {});
 
-  // Par nom : 20 essais lancés d'un coup, le bon mot de passe en dernier.
+  // Même compte, 20 essais d'un coup depuis 20 adresses, le bon mot de passe en dernier : un seul est évalué.
   const byName = await statuses(Array.from({ length: 20 }, (_, i) =>
-    s.req('POST', '/api/auth/login', { body: { username: 'victime', password: i === 19 ? PW : `faux ${i}` }, ip: `10.1.0.${i}` })));
-  assert.deepEqual(tally(byName), { 401: 5, 429: 15 });
+    s.req('POST', '/api/auth/login', { body: { username: 'victime', password: i === 19 ? PW : 'faux ' + i }, ip: '10.1.0.' + i })));
+  assert.deepEqual(tally(byName), { 401: 1, 429: 19 });
 
-  // Par adresse : noms différents, même adresse.
-  const byIp = await statuses(Array.from({ length: 10 }, (_, i) =>
-    s.req('POST', '/api/auth/login', { body: { username: `nom${i}`, password: 'faux' }, ip: '10.2.0.1' })));
-  assert.deepEqual(tally(byIp), { 401: 5, 429: 5 });
+  // Même adresse, comptes différents : 10 évalués.
+  const byIp = await statuses(Array.from({ length: 15 }, (_, i) =>
+    s.req('POST', '/api/auth/login', { body: { username: 'nom' + i, password: 'faux' }, ip: '10.2.0.1' })));
+  assert.deepEqual(tally(byIp), { 401: 10, 429: 5 });
 
-  // Une tentative réussie ne laisse pas d'échec derrière elle : 5 connexions réussies simultanées depuis une adresse,
-  // puis 5 échecs encore permis depuis cette adresse.
-  for (let i = 0; i < 5; i++) s.user(`ami${i}`);
+  // Des connexions réussies ne laissent pas d'échec derrière elles.
+  for (let i = 0; i < 5; i++) s.user('ami' + i);
   assert.deepEqual(tally(await statuses(Array.from({ length: 5 }, (_, i) =>
-    s.req('POST', '/api/auth/login', { body: { username: `ami${i}`, password: PW }, ip: '10.3.0.1' })))), { 200: 5 });
-  for (let i = 0; i < 5; i++) assert.equal((await s.req('POST', '/api/auth/login', { body: { username: `x${i}`, password: 'faux' }, ip: '10.3.0.1' })).status, 401);
-  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'x9', password: 'faux' }, ip: '10.3.0.1' })).status, 429);
+    s.req('POST', '/api/auth/login', { body: { username: 'ami' + i, password: PW }, ip: '10.3.0.1' })))), { 200: 5 });
+  for (let i = 0; i < 10; i++) assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'x' + i, password: 'faux' }, ip: '10.3.0.1' })).status, 401);
+  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'x99', password: 'faux' }, ip: '10.3.0.1' })).status, 429);
 
-  // Même chose pour la ressaisie du mot de passe à la suppression du compte.
+  // Ressaisie du mot de passe à la suppression : une seule évaluée.
   const u = s.user('julie');
   const del = await statuses(Array.from({ length: 8 }, () => s.req('DELETE', '/api/me', { cookie: u.cookie, body: { password: 'faux' } })));
-  assert.deepEqual(tally(del), { 403: 5, 429: 3 });
+  assert.deepEqual(tally(del), { 403: 1, 429: 7 });
 });
 
 test('scrypt : calculs simultanés bornés ; file pleine → 429 retryAfter 1 immédiat, sans compter d\'échec', async () => {
@@ -716,10 +737,10 @@ test('scrypt : calculs simultanés bornés ; file pleine → 429 retryAfter 1 im
     assert.deepEqual(r.body, { error: 'too_many_attempts', retryAfter: 1 });
     assert.equal(r.headers.get('retry-after'), '1');
   }
-  // Une requête refusée faute de place n'a pas compté d'échec : 5 échecs encore permis depuis son adresse.
+  // Une requête refusée faute de place n'a pas compté d'échec : 10 échecs encore permis depuis son adresse.
   const ip = `10.4.0.${rs.indexOf(busy[0] as typeof rs[number])}`;
-  for (let i = 0; i < 5; i++) assert.equal((await s.req('POST', '/api/auth/login', { body: { username: `y${i}`, password: 'faux' }, ip })).status, 401);
-  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'y9', password: 'faux' }, ip })).status, 429);
+  for (let i = 0; i < 10; i++) assert.equal((await s.req('POST', '/api/auth/login', { body: { username: `y${i}`, password: 'faux' }, ip })).status, 401);
+  assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'y99', password: 'faux' }, ip })).status, 429);
   // La file se vide : tout repasse.
   assert.equal((await s.req('POST', '/api/auth/login', { body: { username: 'z', password: 'faux' }, ip: '10.5.0.1' })).status, 401);
 });
