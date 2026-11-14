@@ -855,11 +855,11 @@ export class App extends Component {
   enterApp(me, text) {
     try { history.replaceState({ nav: 0 }, '', '/'); } catch { /* adresse inchangée */ }
     this.resetSession(null);
-    this.setState({ me });
+    // signedIn lit this.state.me : seulement une fois l'état appliqué (setState est différé).
+    this.setState({ me }, () => this.signedIn());
     this.pendingScroll = 'anchor';
     this.loadTab('encours');
     if (text) this.toast(text);
-    this.signedIn();
   }
 
   // Les écritures en attente partent d'abord (sinon un swipe juste avant serait perdu).
