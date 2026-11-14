@@ -76,6 +76,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .poster { flex: none; display: block; object-fit: cover; background: var(--chip); }
 /* Blocs réservés pendant un chargement : même taille que le contenu attendu. */
 .ph-line { display: block; height: 12px; border-radius: 6px; background: var(--chip); }
+/* Lien sortant (fiche TMDB, JustWatch) : discret, ouvert dans le navigateur. */
+.extlink { align-self: flex-start; font-size: 12px; color: var(--faint); text-decoration: none; }
+.prov ~ .extlink { align-self: center; }
+.extlink:hover { color: var(--muted); text-decoration: underline; }
 .note { margin: 0; font-size: 13px; color: var(--muted); }
 .toast { position: absolute; left: 12px; right: 12px; bottom: calc(84px + var(--safe-bottom)); height: 52px; box-sizing: border-box; border-radius: 14px; background: var(--toast); color: var(--fg); border: 1px solid var(--cardline); box-shadow: 0 8px 24px var(--shadow); display: flex; align-items: center; gap: 10px; padding: 0 6px 0 16px; z-index: 5; }
 .overlay { position: absolute; inset: 0; z-index: 10; background: var(--backdrop); display: flex; align-items: flex-end; }

@@ -2,8 +2,8 @@
 // Explorateur, fiche série : sélecteur de suivi, où regarder, résumé, saisons (coche de saison avec confirmation).
 import { html } from '../../vendor/htm-preact-3.1.1.js';
 import { I } from '../icons.js';
-import { CHIPS, countryName, plural, showMeta } from '../format.js';
-import { dot, dotView, loadError, navHeader, phLine, poster, providersRow, segmented } from '../components.js';
+import { CHIPS, countryName, plural, showMeta, tmdbUrl, tmdbWatchUrl } from '../format.js';
+import { dot, dotView, extLink, loadError, navHeader, phLine, poster, providersRow, segmented } from '../components.js';
 
 /** @param {import('../app.js').App} app @param {any} st @param {import('../app.js').View} top */
 export function viewShow(app, st, top) {
@@ -52,6 +52,7 @@ export function viewShow(app, st, top) {
           <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint)">Où regarder · ${countryName(d.providers.country)}</span>
           ${groups.map((/** @type {any} */ g) => html`<div key=${g.from} style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px">${g.label ? html`<span style="flex: none; min-width: 76px; font-size: 12px; color: var(--faint)">${g.label}</span>` : null}${providersRow(g.items)}</div>`)}
           ${groups.length ? null : html`<span style="font-size: 13px; color: var(--faint)">Aucune plateforme d’abonnement connue</span>`}
+          ${extLink(tmdbWatchUrl(id, d.providers.country), 'Données JustWatch')}
         </section>
         <p style="margin: 0; font-size: 14px; line-height: 1.55; color: var(--soft)">${d.overview || 'Pas de résumé disponible.'}</p>
         <h2 class="eyebrow" style="margin-top: 6px">Saisons</h2>
@@ -73,6 +74,7 @@ export function viewShow(app, st, top) {
             </div>`;
           })}
         </div>
+        ${extLink(tmdbUrl(id), 'Fiche TMDB')}
       </div>
     </div>`;
 }

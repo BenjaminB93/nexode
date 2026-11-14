@@ -19,6 +19,11 @@ export function poster(path, w, h, r, extra) {
     : html`<span class="poster" aria-hidden="true" style=${style}></span>`;
 }
 
+/** Lien sortant discret, ouvert hors de l'appli. @param {string} href @param {string} label */
+export function extLink(href, label) {
+  return html`<a class="extlink" href=${href} target="_blank" rel="noopener noreferrer">${label} ↗</a>`;
+}
+
 /** Logos des plateformes. @param {{ id: number, name: string, logoPath: string | null }[]} items */
 export function providersRow(items) {
   return items.map((pv) => {

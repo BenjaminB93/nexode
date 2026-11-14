@@ -106,6 +106,18 @@ export const HOURS = Array.from({ length: 24 }, (_, h) => ({ v: String(h), l: h 
 // Noms des pays fournis par le navigateur (codes ISO 3166-1) ; sans Intl.DisplayNames, le code s'affiche.
 const REGION_NAMES = (() => { try { return new Intl.DisplayNames(['fr'], { type: 'region' }); } catch { return null; } })();
 
+const TMDB_SITE = 'https://www.themoviedb.org/tv/';
+
+/** Fiche TMDB d'une série, ou d'un épisode si saison et numéro sont donnés. @param {number} showId @param {number} [season] @param {number} [number] */
+export function tmdbUrl(showId, season, number) {
+  return TMDB_SITE + showId + (season !== undefined && number !== undefined ? '/season/' + season + '/episode/' + number : '') + '?language=fr-FR';
+}
+
+/** Page « Où regarder » TMDB (données JustWatch, liens vers les plateformes). @param {number} showId @param {string | null | undefined} country */
+export function tmdbWatchUrl(showId, country) {
+  return TMDB_SITE + showId + '/watch' + (country ? '?locale=' + encodeURIComponent(country) : '');
+}
+
 /** @param {string} c */
 export function countryName(c) {
   try { return (REGION_NAMES && REGION_NAMES.of(c)) || c; } catch { return c; }
