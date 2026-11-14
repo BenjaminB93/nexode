@@ -22,6 +22,7 @@ Deux conteneurs : l'appli, qui n'ouvre aucun port, et **Caddy**, seul joignable 
 Prérequis :
 
 - Docker et le plugin compose sur le Pi (`docker compose version` répond).
+- Raspberry Pi OS désactive les limites mémoire des conteneurs (`cgroup_disable=memory`) : ajouter ` cgroup_enable=memory` à la fin de l'unique ligne de `/boot/firmware/cmdline.txt` puis redémarrer, sinon `mem_limit` est ignoré (avertissement au `docker compose up`). Un conteneur créé avant doit être recréé (`--force-recreate`).
 - Box : ports TCP 80 et 443 redirigés vers le Pi (UDP 443 en plus pour HTTP/3, facultatif).
 - Le nom de domaine (ex. `series.exemple.fr`) pointe vers l'adresse publique de la box.
 
