@@ -23,8 +23,10 @@
     "web-push": "3.6.7"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "@types/node": "26.6.6",
     "@types/web-push": "3.6.4",
+    "opentype.js": "2.0.0",
     "typescript": "7.0.2"
   }
 }

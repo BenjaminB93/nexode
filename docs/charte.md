@@ -6,10 +6,11 @@ Les valeurs vivent dans [public/app/style.css](../public/app/style.css) (variabl
 
 Le « o » de Nexode. Anneau ouvert en trait plein (épisodes vus), flèche arrondie à 3 h pointant vers la droite (le prochain épisode), deux points qui s'effacent dessous (la suite).
 
-Sources : [docs/logo/](logo/)
-- `nexode-icone-sombre.svg` : icône principale (fond sombre).
-- `nexode-icone-ambre.svg` : icône sur fond ambre (marque foncée, flèche blanche).
-- `nexode-marque.svg` : la marque seule, sans fond.
+Tous les fichiers de la marque sont générés par [tools/brand.ts](../tools/brand.ts), qui porte la construction ci-dessous : `node tools/brand.ts` sur le PC (dépendances de développement resvg-js et opentype.js, absentes de l'image Docker). L'outil refuse de générer si deux éléments de la marque se touchent presque.
+
+- [docs/logo/](logo/) : `nexode-icone-sombre.svg` (icône principale), `nexode-icone-ambre.svg` (fond ambre, marque foncée, flèche blanche), `nexode-marque.svg` (marque seule), `nexode-nom-sombre.svg` et `nexode-nom-clair.svg` (nom écrit).
+- [public/icons/](../public/icons/) : `icon.svg` (onglet), `icon-192.png` et `icon-512.png` (coins arrondis), `maskable-512.png` (pleine, Android découpe), `apple-touch-icon.png` (180, pleine, iOS arrondit), `badge-96.png` (marque blanche sur transparent, barre de notifications Android).
+- [public/app/brand.js](../public/app/brand.js) : le nom écrit en tracés, affiché par `Wordmark(hauteur)` ([components.js](../public/app/components.js)) aux couleurs du thème.
 
 Construction (boîte 512, centre 256, angles comptés depuis midi dans le sens horaire) :
 
@@ -22,7 +23,7 @@ Construction (boîte 512, centre 256, angles comptés depuis midi dans le sens h
 
 Couleurs de l'icône sombre : anneau `#D3D8DF`, flèche `#F2B544`, traîne `#6B7380`, fond dégradé `#1F232C` → `#0F1115`. Icône ambre : fond `#F7C663` → `#EBA62C`, anneau et traîne `#1A1406`, flèche `#FFFFFF`.
 
-**Nom écrit** : « nexode » en minuscules, Space Grotesk 700, la marque à la place du o (hauteur 0,54 em, trait 16 sur une boîte de 100 pour égaler la graisse des lettres). La flèche pointe vers « de ». Dans le nom écrit, l'arc s'arrête 8° plus tôt et la traîne est décalée (137°, 164°) pour garder au moins 2 px entre les éléments.
+**Nom écrit** : « nexode » en minuscules, Space Grotesk 700, approche -0,02 em, la marque à la place du o (hauteur 0,54 em, trait 20 sur une boîte de 100 pour égaler les jambages). La flèche pointe vers « de ». Dans le nom écrit, l'arc va de 201° à 393° et la traîne est décalée (138°, 166°) pour garder au moins 2 px entre les éléments à 48 px. Lettres et anneau couleur du texte, flèche `--accent`, traîne `--dim`.
 
 Règles : pas de bouton lecture centré, de jauge, d'horloge ni de « … » (le logo ne doit rappeler aucun objet connu). Au-dessous de 32 px, la traîne disparaît dans le flou : c'est accepté.
 

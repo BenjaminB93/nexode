@@ -2,6 +2,7 @@
 // Éléments d'interface partagés par les vues (fonctions → vnode, sans état propre).
 import { html } from '../vendor/htm-preact-3.1.1.js';
 import { I } from './icons.js';
+import { WORDMARK } from './brand.js';
 import { ROLES, logoUrl, posterUrl } from './format.js';
 
 /** @param {Event} ev */
@@ -287,4 +288,21 @@ export function loadError(retry) {
     <p class="note">Chargement impossible</p>
     <button type="button" class="btn btn-ghost press" style="height: 44px; padding: 0 16px; font-size: 14px" onClick=${retry}>Réessayer</button>
   </div>`;
+}
+
+/**
+ * Nom écrit « nexode » (tracés générés par tools/brand.ts, voir docs/charte.md) : lettres et anneau couleur du texte,
+ * flèche ambre, traîne en gris d'icône. Suit le thème.
+ * @param {number} h hauteur en px, de la hampe du d à la ligne de base
+ */
+export function Wordmark(h) {
+  const [, , vw = 1, vh = 1] = WORDMARK.viewBox.split(' ').map(Number);
+  return html`<svg role="img" aria-label="Nexode" viewBox=${WORDMARK.viewBox} width=${Math.round(h * vw / vh)} height=${h} style="display: block; flex: none">
+    <path d=${WORDMARK.letters} style="fill: var(--fg)"></path>
+    ${WORDMARK.parts.map((/** @type {any} */ p) => p.kind === 'ring'
+      ? html`<path d=${p.d} fill="none" stroke-width=${p.sw} stroke-linecap="round" style="stroke: var(--fg)"></path>`
+      : p.kind === 'arrow'
+        ? html`<path d=${p.d} stroke-width=${p.sw} stroke-linejoin="round" style="fill: var(--accent); stroke: var(--accent)"></path>`
+        : html`<circle cx=${p.cx} cy=${p.cy} r=${p.r} fill-opacity=${p.op} style="fill: var(--dim)"></circle>`)}
+  </svg>`;
 }

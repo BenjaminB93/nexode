@@ -1,9 +1,8 @@
 // @ts-check
 // Pages hors appli : connexion, inscription par lien d'invitation, nouveau mot de passe, lien invalide.
 import { html } from '../../vendor/htm-preact-3.1.1.js';
-import { I } from '../icons.js';
 import { PASSWORD_MIN, cleanName, nameOk, nameProblem, passwordLength, passwordOk } from '../auth.js';
-import { field, formError, passwordField, phLine } from '../components.js';
+import { Wordmark, field, formError, passwordField, phLine } from '../components.js';
 
 /** @param {import('../app.js').App} app @param {any} st */
 export function viewAuth(app, st) {
@@ -59,7 +58,7 @@ export function viewAuth(app, st) {
   const enabled = ok && !f.busy && !f.wait;
   return html`<div class="screen v-fwd" style="overflow-y: auto">
     <form onSubmit=${(/** @type {Event} */ ev) => { ev.preventDefault(); if (enabled) app.submitAuth(); }} style="max-width: 380px; margin: 0 auto; padding: 56px 24px 32px; display: flex; flex-direction: column; gap: 18px">
-      <span style="display: flex; align-items: center; gap: 10px; color: var(--accent); font: 700 15px var(--display)">${I.tv()}Suivi de séries</span>
+      ${Wordmark(30)}
       <span style="display: flex; flex-direction: column; gap: 6px; margin: 12px 0 6px">
         <h1 class="h1" style="font-size: 26px">${title}</h1>
         ${sub}
