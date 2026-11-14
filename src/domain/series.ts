@@ -66,8 +66,9 @@ export function computeStatus<E extends EpisodeLike>(input: StatusInput<E>): Sta
   if (follow?.state === 'shelved') status = 'decote';
   else if (unwatched.length === 0) status = FINISHED.has(input.showStatus) && future.length === 0 ? 'terminee' : 'ajour';
   else {
-    // Dernière activité : dernier épisode vu, ajout de la série, ou reprise explicite.
-    const refs: string[] = [];
+    // Dernière activité : dernier épisode vu, ajout de la série, reprise explicite, ou fin de l'état « à jour »
+    // (sortie du plus ancien épisode non vu : une nouvelle saison ne met pas de côté une série vue jusqu'au bout).
+    const refs: string[] = [unwatched.reduce((d, e) => (e.airDate! < d ? e.airDate! : d), today)];
     if (lastWatchedDay) refs.push(lastWatchedDay);
     if (follow) refs.push(localDate(follow.addedAt, timezone));
     if (follow?.resumedAt) refs.push(localDate(follow.resumedAt, timezone));

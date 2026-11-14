@@ -69,6 +69,14 @@ test('seuil dépassé seulement s\'il reste des épisodes sortis non vus', () =>
   assert.equal(stale.status, 'decote');
 });
 
+test('nouvelle saison d\'une série vue jusqu\'au bout : le seuil part de la sortie du premier épisode non vu', () => {
+  const base = { follow: followed('2026-08-01T10:00:00.000Z'), watched: new Map([[101, '2026-09-01T20:00:00.000Z']]) };
+  const at = (day: string) => computeStatus(input({ ...base, episodes: eps([1, 1, '2026-08-20'], [2, 1, day], [2, 2, '2026-11-13']) })).status;
+  assert.equal(at('2026-11-13'), 'encours');   // sortie aujourd'hui
+  assert.equal(at('2026-10-14'), 'encours');   // 30 jours
+  assert.equal(at('2026-10-13'), 'decote');    // 31 jours sans regarder la nouvelle saison
+});
+
 test('seuil : 30 jours pile = en cours, 31 = de côté ; paramétrable', () => {
   const at = (day: string) => computeStatus(input({ watched: new Map([[101, `${day}T12:00:00.000Z`]]), follow: followed('2026-01-01T00:00:00.000Z') })).status;
   assert.equal(at('2026-10-14'), 'encours');   // 30 jours avant le 13/11
