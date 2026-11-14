@@ -223,3 +223,28 @@ test('POST /api/import : essai puis import, fichier non reconnu refusé, corps d
   assert.equal((db.prepare('SELECT count(*) n FROM watched').get() as { n: number }).n, 4);
   assert.equal((await post({ files: [], dryRun: true })).status, 400);
 });
+
+test('homonymes à égalité d\'épisodes : la série déjà connue l\'emporte (même import ou historique existant)', async () => {
+  for (const mode of ['même import', 'import précédent'] as const) {
+    const db = testDb();
+    const catalog = new FakeCatalog(db, [
+      // BetaSeries compte le pilote double 2 fois : E1, E3…E6 ; la série de 2011 n'a que 5 épisodes, celle de 2020 en a 6.
+      { id: 5020, name: 'Terra Nova', firstAirDate: '2020-06-03', seasons: [Array(6).fill('2020-06-03')] },
+      { id: 5011, name: 'Terra Nova', firstAirDate: '2011-09-26', seasons: [Array(5).fill('2011-09-26')] },
+    ]);
+    catalog.tvdbShows.set(164091, 5011);
+    catalog.searchShows = async () => [
+      { id: 5020, name: 'Terra Nova', originalName: 'Terra Nova', year: 2020, posterPath: null },
+      { id: 5011, name: 'Terra Nova', originalName: 'Terra Nova', year: 2011, posterPath: null },
+    ];
+    const userId = addUser(db, 'camille');
+    const tv = { name: 'tracking-prod-records-v2.csv', text: [TV_HEADER, tvWatch('watch', 164091, 1, 1, 1, '2022-11-17 19:09:47', 'Terra Nova')].join('\n') };
+    const bs = { name: 'episodes.csv', text: bsEpisodes([1, 3, 4, 5, 6].map((e) => ['Terra Nova', 'S01E0' + e, '2022-11-17 20:09:47'] as [string, string, string])) };
+    if (mode === 'même import') await importHistory({ db, catalog }, userId, parseImportFiles([bs, tv]).data);
+    else {
+      await importHistory({ db, catalog }, userId, parseImportFiles([tv]).data);
+      await importHistory({ db, catalog }, userId, parseImportFiles([bs]).data);
+    }
+    assert.deepEqual(watchedRows(db, userId).map(([id]) => id), [1, 3, 4, 5].map((e) => epId(5011, 1, e)), mode);
+  }
+});

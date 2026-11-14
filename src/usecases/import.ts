@@ -19,6 +19,7 @@ export type ImportReport = {
 };
 
 const CANDIDATES_MAX = 3;
+const KNOWN_RATIO = 0.8;
 
 type Resolved = { showId: number; approximate: string | null };
 
@@ -42,12 +43,19 @@ export async function importHistory(deps: ImportDeps, userId: number, data: Impo
   for (const w of data.watches) refOf(w.show).positions.add(`${w.season}:${w.number}`);
   for (const s of data.series) refOf(s.show);
 
-  // 1. Séries.
+  // 1. Séries. Celles désignées par id TheTVDB d'abord : elles servent à départager les titres ambigus qui suivent.
+  // Séries « connues » : déjà dans l'historique ou les séries de l'utilisateur, ou retrouvées sûrement dans cet import.
+  const known = new Set<number>([
+    ...(db.prepare('SELECT DISTINCT e.show_id AS id FROM watched w JOIN episodes e ON e.id = w.episode_id WHERE w.user_id = ?').all(userId) as { id: number }[]).map((r) => r.id),
+    ...(db.prepare('SELECT show_id AS id FROM user_shows WHERE user_id = ?').all(userId) as { id: number }[]).map((r) => r.id),
+  ]);
   const resolved = new Map<string, Resolved>();
   let n = 0;
-  for (const [k, { ref, positions }] of refs) {
+  const ordered = [...refs].sort(([, a], [, b]) => Number(b.ref.tvdbId !== null) - Number(a.ref.tvdbId !== null));
+  for (const [k, { ref, positions }] of ordered) {
     try {
-      const r = await resolveShow(deps, ref, positions);
+      const r = await resolveShow(deps, ref, positions, known);
+      if (r && ref.tvdbId !== null) known.add(r.showId);
       if (!r) throw new Error('introuvable sur TMDB');
       resolved.set(k, r);
       report.shows.found++;
@@ -118,7 +126,7 @@ export async function importHistory(deps: ImportDeps, userId: number, data: Impo
 
 const label = (ref: ShowRef) => (ref.year ? `${ref.title} (${ref.year})` : ref.title);
 
-async function resolveShow(deps: ImportDeps, ref: ShowRef, positions: Set<string>): Promise<Resolved | null> {
+async function resolveShow(deps: ImportDeps, ref: ShowRef, positions: Set<string>, known: ReadonlySet<number>): Promise<Resolved | null> {
   const { db, catalog } = deps;
   if (ref.tvdbId !== null) {
     const id = await catalog.findShowByTvdb(ref.tvdbId);
@@ -144,18 +152,27 @@ async function resolveShow(deps: ImportDeps, ref: ShowRef, positions: Set<string
   if (approximate) candidates = [...new Set(results.map((r) => r.id))].slice(0, CANDIDATES_MAX);
   if (!candidates.length) return null;
 
-  // Plusieurs candidats : celui qui contient le plus d'épisodes vus ; à égalité, l'année la plus proche, puis l'ordre TMDB.
-  let best = { id: candidates[0] as number, hits: -1, gap: Infinity };
+  // Plusieurs candidats, classés par épisodes vus qu'ils contiennent. Une série déjà connue l'emporte si elle en contient
+  // au moins KNOWN_RATIO du meilleur (les numérotations diffèrent un peu : « Terra Nova » de 2011, pilote double compté 2 fois
+  // chez BetaSeries, 10 positions sur 11, contre 11 pour l'homonyme de 2020). Ensuite : l'année la plus proche, l'ordre TMDB.
+  let bestId = candidates.find((id) => known.has(id)) ?? (candidates[0] as number);
   if (candidates.length > 1 && positions.size) {
     const count = db.prepare('SELECT season, number FROM episodes WHERE show_id = ? AND removed_at IS NULL');
-    for (const id of candidates.slice(0, CANDIDATES_MAX)) {
+    const examined = [...new Set([...candidates.slice(0, CANDIDATES_MAX), ...candidates.filter((id) => known.has(id))])];
+    const scored: { id: number; hits: number; known: boolean; gap: number }[] = [];
+    for (const id of examined) {
       await catalog.ensureShow(id);
       const hits = (count.all(id) as { season: number; number: number }[]).filter((e) => positions.has(`${e.season}:${e.number}`)).length;
       const y = yearOf.get(id);
-      const gap = ref.year && y ? Math.abs(y - ref.year) : Infinity;
-      if (hits > best.hits || (hits === best.hits && gap < best.gap)) best = { id, hits, gap };
+      scored.push({ id, hits, known: known.has(id), gap: ref.year && y ? Math.abs(y - ref.year) : Infinity });
     }
+    const max = Math.max(...scored.map((c) => c.hits));
+    const knownOk = scored.filter((c) => c.known && c.hits > 0 && c.hits >= KNOWN_RATIO * max);
+    const pool = knownOk.length ? knownOk : scored.filter((c) => c.hits === max);
+    pool.sort((x, y) => y.hits - x.hits || x.gap - y.gap);
+    bestId = (pool[0] as { id: number }).id;
   }
+  const best = { id: bestId };
   await catalog.ensureShow(best.id);
   const name = (db.prepare('SELECT name FROM shows WHERE id = ?').get(best.id) as { name: string } | undefined)?.name ?? '';
   return { showId: best.id, approximate: approximate ? name : null };
