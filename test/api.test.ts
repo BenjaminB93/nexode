@@ -200,10 +200,18 @@ test('PATCH /api/me : champs facultatifs, persistance, réponse = GET /api/me', 
   assert.deepEqual(b.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 15, notifOn: false, notifHour: 23, timezone: 'Europe/Paris' });
   assert.deepEqual((await call('PATCH', '/api/me', {})).body, b.body);
   assert.deepEqual((await call('GET', '/api/me')).body, b.body);
-  for (const country of ['FR', 'BE', 'CH', 'CA']) assert.equal((await call('PATCH', '/api/me', { country })).body.country, country);
+  for (const country of ['FR', 'BE', 'CH', 'CA', 'GB']) assert.equal((await call('PATCH', '/api/me', { country })).body.country, country);
   for (const d of [15, 30, 60, 90]) assert.equal((await call('PATCH', '/api/me', { shelveAfterDays: d })).body.shelveAfterDays, d);
   assert.equal((await call('PATCH', '/api/me', { notifHour: 0 })).body.notifHour, 0);
   assert.equal((await call('PATCH', '/api/me', { notifOn: true })).body.notifOn, true);
+});
+
+test('GET /api/countries : liste JustWatch du catalogue ; catalogue indisponible → 502', async () => {
+  const { call, catalog } = setup();
+  assert.deepEqual((await call('GET', '/api/countries')).body, { countries: ['BE', 'CA', 'CH', 'FR', 'GB'] });
+  catalog.offline = true;
+  assert.equal((await call('GET', '/api/countries')).status, 502);
+  assert.equal((await call('PATCH', '/api/me', { country: 'BE' })).status, 502);
 });
 
 test('PATCH /api/me : validation → 400 sans écriture partielle', async () => {
@@ -214,7 +222,8 @@ test('PATCH /api/me : validation → 400 sans écriture partielle', async () => 
     assert.equal(r.status, 400, JSON.stringify(body));
     assert.deepEqual(r.body, { error: 'invalid_input', field }, JSON.stringify(body));
   };
-  await bad({ country: 'US' }, 'country');
+  await bad({ country: 'US' }, 'country');   // absent de la liste JustWatch du faux catalogue
+  await bad({ country: 'FRA' }, 'country');
   await bad({ country: 'fr' }, 'country');
   await bad({ country: null }, 'country');
   await bad({ shelveAfterDays: 45 }, 'shelveAfterDays');

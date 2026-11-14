@@ -14,6 +14,7 @@ function recordingCatalog(failIds: number[] = []) {
   const catalog: Catalog = {
     ensureShow: async () => assert.fail('ensureShow inattendu'),
     ensureProviders: async () => assert.fail('ensureProviders inattendu'),
+    regions: async () => assert.fail('regions inattendu'),
     searchShows: async () => assert.fail('searchShows inattendu'),
     findShowByTvdb: async () => assert.fail('findShowByTvdb inattendu'),
     findEpisodeByTvdb: async () => assert.fail('findEpisodeByTvdb inattendu'),

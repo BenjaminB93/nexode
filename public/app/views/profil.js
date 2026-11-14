@@ -3,7 +3,7 @@
 // parrainages et comptes selon le rôle, export des données, déconnexion, suppression du compte.
 import { html } from '../../vendor/htm-preact-3.1.1.js';
 import { I } from '../icons.js';
-import { COUNTRIES, HOURS, THEMES, THRESHOLDS, plural } from '../format.js';
+import { HOURS, THEMES, THRESHOLDS, countryChoices, plural } from '../format.js';
 import { canInvite } from '../auth.js';
 import { header, loadError, phLine, roleChip, segmented } from '../components.js';
 
@@ -11,9 +11,10 @@ import { header, loadError, phLine, roleChip, segmented } from '../components.js
 export function viewProfil(app, st) {
   const me = st.me;
   // Ligne de réglage : la valeur s'ouvre dans une feuille en bas d'écran (liste, ou grille pour les heures).
-  /** @param {string} label @param {string | null} value @param {{ v: string, l: string }[]} list @param {(v: string) => void} onPick @param {boolean} [grid] */
-  const pick = (label, value, list, onPick, grid) => html`<button type="button" class="row pickrow" disabled=${value === null}
-    onClick=${() => { if (value !== null) app.setState({ picker: { title: label, value, list, onPick, grid: !!grid } }); }}>
+  // ready = false : valeur affichée, feuille pas encore disponible (liste en chargement).
+  /** @param {string} label @param {string | null} value @param {{ v: string, l: string }[]} list @param {(v: string) => void} onPick @param {boolean} [grid] @param {boolean} [ready] */
+  const pick = (label, value, list, onPick, grid, ready = true) => html`<button type="button" class="row pickrow" disabled=${value === null || !ready}
+    onClick=${() => { if (value !== null && ready) app.setState({ picker: { title: label, value, list, onPick, grid: !!grid } }); }}>
     <span>${label}</span><span class="pickval">${value === null ? ' ' : (list.find((o) => o.v === value) || list[0]).l}${I.down()}</span></button>`;
   /** Ligne qui ouvre un écran ou une feuille. @param {string} label @param {string | null} right @param {() => void} onClick */
   const navRow = (label, right, onClick) => html`<button type="button" class="row pickrow" onClick=${onClick}>
@@ -38,7 +39,8 @@ export function viewProfil(app, st) {
         ${st.errs.me && !me ? loadError(() => app.loadMe()) : null}
         <section class="group">
           <div class="row" style="padding-right: 12px"><span>Thème</span>${segmented('Thème', THEMES, st.theme, (v) => app.setTheme(v), 'flex: none; width: 210px')}</div>
-          ${pick('Pays', me ? me.country : null, COUNTRIES, (v) => app.patchMe({ country: v }))}
+          ${pick('Pays', me ? me.country : null, me ? countryChoices([...new Set([...(st.countries || []), me.country])]) : [],
+            (v) => app.patchMe({ country: v }), false, !!st.countries)}
           ${pick('Mettre de côté après', me ? String(me.shelveAfterDays) : null, THRESHOLDS, (v) => app.patchMe({ shelveAfterDays: Number(v) }))}
         </section>
         <section class="group">

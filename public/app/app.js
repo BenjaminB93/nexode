@@ -74,7 +74,7 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  * @typedef {{
  *   tab: string, stack: View[], drag: any, toast: { text: string, undo: (() => void) | null } | null,
  *   picker: any, confirm: any, upcomingOpen: boolean, theme: string,
- *   me: any, today: string | null, tl: any, hist: any, shelf: any, mine: any,
+ *   me: any, countries: string[] | null, today: string | null, tl: any, hist: any, shelf: any, mine: any,
  *   search: { q: string, results: any[] | null, loading: boolean, error: boolean },
  *   shows: Record<number, any>, seasons: Record<string, any>, errs: Record<string, boolean>,
  *   auth: Auth | null, form: Form,
@@ -108,7 +108,7 @@ function initialState(theme) {
   return {
     tab: 'encours', stack: [], drag: null, toast: null, picker: null, confirm: null, upcomingOpen: false,
     theme,
-    me: null, today: null,
+    me: null, countries: null, today: null,
     tl: null, hist: null, shelf: null, mine: null,
     search: { q: '', results: null, loading: false, error: false },
     shows: {}, seasons: {},
@@ -289,6 +289,8 @@ export class App extends Component {
     else if (t === 'series') this.loadMine();
     else if (t === 'profil') {
       this.loadMine();
+      // Pays JustWatch : chargés une fois par session ; en échec, la ligne Pays reste inactive jusqu'à la visite suivante.
+      if (!this.state.countries) this.read(() => api.countries(), (r) => this.setState({ countries: r.countries }), () => {});
       // Le rôle décide des lignes Parrainages / Comptes et de leurs compteurs.
       this.loadMe().then((ok) => {
         const me = this.state.me;

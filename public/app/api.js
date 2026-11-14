@@ -83,6 +83,7 @@ export const api = {
   me: () => call('GET', '/me'),
   /** @param {{ country?: string, shelveAfterDays?: number, notifOn?: boolean, notifHour?: number }} patch */
   patchMe: (patch) => call('PATCH', '/me', patch),
+  countries: () => call('GET', '/countries'),
   timeline: () => call('GET', '/timeline'),
   /** @param {string | null} before curseur opaque renvoyé par la page précédente */
   history: (before) => call('GET', '/history' + (before ? '?before=' + seg(before) : '')),

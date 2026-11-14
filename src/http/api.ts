@@ -12,7 +12,7 @@ import { createInvite, listInvites, revokeInvite } from '../usecases/invites.ts'
 import { HISTORY_PAGE, decodeCursor, history, myShows, shelf, timeline } from '../usecases/lists.ts';
 import { setRelation } from '../usecases/relation.ts';
 import { search } from '../usecases/search.ts';
-import { COUNTRIES, SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, updateSettings } from '../usecases/settings.ts';
+import { SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, listCountries, updateSettings } from '../usecases/settings.ts';
 import { seasonDetail, showDetail } from '../usecases/show.ts';
 import { type MarkEntry, markSeason, markWatched, unmarkWatched, watchedUntil } from '../usecases/watched.ts';
 import { type AuthEnv, type Limits, clearSessionCookie } from './auth.ts';
@@ -39,12 +39,14 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     const ctx = ctxOf(c);
     const body = await jsonBody(c, ['country', 'shelveAfterDays', 'notifOn', 'notifHour']);
     const patch: SettingsPatch = {};
-    if (body.country !== undefined) patch.country = oneOf(body.country, COUNTRIES, 'country');
+    if (body.country !== undefined) patch.country = str(body.country, 'country', 2);
     if (body.shelveAfterDays !== undefined) patch.shelveAfterDays = intOneOf(body.shelveAfterDays, SHELVE_AFTER_DAYS, 'shelveAfterDays');
     if (body.notifOn !== undefined) patch.notifOn = bool(body.notifOn, 'notifOn');
     if (body.notifHour !== undefined) patch.notifHour = intRange(body.notifHour, 0, 23, 'notifHour');
-    return c.json(updateSettings(ctx, patch));
+    return c.json(await updateSettings(ctx, patch));
   });
+
+  api.get('/countries', async (c) => c.json({ countries: await listCountries(ctxOf(c)) }));
 
   // Mot de passe ressaisi ; les échecs comptent comme des échecs de connexion sur ce nom.
   api.delete('/me', async (c) => {

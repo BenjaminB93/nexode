@@ -65,8 +65,12 @@ export function sheet(title, sub, onClose, content) {
   </div>`;
 }
 
+// Une seule fois, à l'ouverture : fonction stable, Preact ne la rappelle pas à chaque rendu.
+/** @param {HTMLElement | null} el */
+const centerOnMount = (el) => { if (el) el.scrollIntoView({ block: 'center' }); };
+
 /**
- * Feuille de choix (remplace un <select> natif) : liste avec la valeur courante cochée, ou grille 6 × 4 pour les heures.
+ * Feuille de choix (remplace un <select> natif) : liste avec la valeur courante cochée et centrée à l'ouverture, ou grille 6 × 4 pour les heures.
  * @param {{ title: string, value: string, list: { v: string, l: string }[], onPick: (v: string) => void, grid?: boolean }} p
  * @param {() => void} onClose
  */
@@ -75,7 +79,7 @@ export function pickerSheet(p, onClose) {
   const choose = (v) => { onClose(); p.onPick(v); };
   return sheet(p.title, null, onClose, p.grid
     ? html`<div role="radiogroup" aria-label=${p.title} class="hourgrid">${p.list.map((o) => html`<button type="button" role="radio" class="hour press" aria-checked=${o.v === p.value ? 'true' : 'false'} onClick=${() => choose(o.v)}>${o.l}</button>`)}</div>`
-    : html`<div role="radiogroup" aria-label=${p.title} style="display: flex; flex-direction: column; gap: 2px">${p.list.map((o) => html`<button type="button" role="radio" class="opt press" aria-checked=${o.v === p.value ? 'true' : 'false'} onClick=${() => choose(o.v)}><span>${o.l}</span>${o.v === p.value ? I.check(null, 18, 3) : null}</button>`)}</div>`);
+    : html`<div role="radiogroup" aria-label=${p.title} style="display: flex; flex-direction: column; gap: 2px">${p.list.map((o) => html`<button type="button" role="radio" class="opt press" aria-checked=${o.v === p.value ? 'true' : 'false'} ref=${o.v === p.value ? centerOnMount : null} onClick=${() => choose(o.v)}><span>${o.l}</span>${o.v === p.value ? I.check(null, 18, 3) : null}</button>`)}</div>`);
 }
 
 /**

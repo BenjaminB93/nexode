@@ -15,6 +15,8 @@ export interface Catalog {
   refreshShow(showId: number): Promise<void>;
   // Plateformes de chaque saison pour un pays ; relevé au plus une fois par 24 h.
   ensureProviders(showId: number, country: string): Promise<void>;
+  // Pays couverts par JustWatch (codes ISO, triés) ; relevés au plus une fois par 24 h.
+  regions(): Promise<string[]>;
   // Recherche TMDB en direct (pas de cache), en français ; year = année de première diffusion.
   searchShows(query: string, year?: number): Promise<SearchResult[]>;
   // Id TMDB d'une série d'après son id TheTVDB (imports) ; null si inconnue. Lit d'abord le cache local.

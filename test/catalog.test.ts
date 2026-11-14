@@ -337,3 +337,28 @@ test('TMDB en panne : série absente du cache → erreur', async () => {
   assert.equal(t.one('SELECT count(*) n FROM shows').n, 0);
   assert.equal(t.warnings.length, 0);
 });
+
+test('pays JustWatch : codes triés et dédoublonnés, cache 24 h, liste périmée servie si TMDB tombe', async () => {
+  const t = setup();
+  const REGIONS = '/watch/providers/regions';
+  t.routes.set(REGIONS, { results: [{ iso_3166_1: 'GB' }, { iso_3166_1: 'FR' }, { iso_3166_1: 'FR' }, { iso_3166_1: 'xx' }] });
+  assert.deepEqual(await t.catalog.regions(), ['FR', 'GB']);
+  assert.deepEqual(await t.catalog.regions(), ['FR', 'GB']);
+  assert.equal(t.requests.filter((r) => r.key === REGIONS).length, 1);
+
+  t.advance(25 * HOUR);
+  t.routes.set(REGIONS, () => ({ status: 503 }));
+  assert.deepEqual(await t.catalog.regions(), ['FR', 'GB']);
+  assert.equal(t.warnings.length, 1);
+
+  t.advance(16 * 60 * 1000);
+  t.routes.set(REGIONS, { results: [{ iso_3166_1: 'BE' }] });
+  assert.deepEqual(await t.catalog.regions(), ['BE']);
+  assert.deepEqual(t.all('SELECT code FROM regions'), [{ code: 'BE' }]);
+});
+
+test('pays JustWatch : TMDB en panne sans liste en cache → erreur', async () => {
+  const t = setup();
+  t.routes.set('/watch/providers/regions', () => ({ status: 503 }));
+  await assert.rejects(t.catalog.regions(), (err: Error) => err.name === 'TmdbError');
+});

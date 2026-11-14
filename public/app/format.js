@@ -100,12 +100,21 @@ export const CHIPS = {
 };
 
 export const THEMES = [{ v: 'system', l: 'Système' }, { v: 'light', l: 'Clair' }, { v: 'dark', l: 'Sombre' }];
-export const COUNTRIES = [{ v: 'FR', l: 'France' }, { v: 'BE', l: 'Belgique' }, { v: 'CH', l: 'Suisse' }, { v: 'CA', l: 'Canada' }];
 export const THRESHOLDS = [{ v: '15', l: '15 jours' }, { v: '30', l: '30 jours' }, { v: '60', l: '2 mois' }, { v: '90', l: '3 mois' }];
 export const HOURS = Array.from({ length: 24 }, (_, h) => ({ v: String(h), l: h + ' h' }));
 
+// Noms des pays fournis par le navigateur (codes ISO 3166-1) ; sans Intl.DisplayNames, le code s'affiche.
+const REGION_NAMES = (() => { try { return new Intl.DisplayNames(['fr'], { type: 'region' }); } catch { return null; } })();
+
 /** @param {string} c */
-export function countryName(c) { return (COUNTRIES.find((x) => x.v === c) || { l: c }).l; }
+export function countryName(c) {
+  try { return (REGION_NAMES && REGION_NAMES.of(c)) || c; } catch { return c; }
+}
+
+/** Choix de pays triés par nom. @param {string[]} codes @returns {{ v: string, l: string }[]} */
+export function countryChoices(codes) {
+  return codes.map((v) => ({ v, l: countryName(v) })).sort((a, b) => a.l.localeCompare(b.l, 'fr'));
+}
 
 /**
  * Jour local ('YYYY-MM-DD') d'un horodatage du serveur : ISO, ou format SQLite « AAAA-MM-JJ HH:MM:SS » (UTC).

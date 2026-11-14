@@ -56,6 +56,7 @@ type TmdbShow = {
 
 type TmdbProvider = { provider_id: number; provider_name: string; logo_path?: string | null; display_priority?: number };
 type TmdbProviders = { results?: Record<string, { flatrate?: TmdbProvider[] } | undefined> };
+type TmdbRegions = { results?: { iso_3166_1: string }[] };
 type TmdbSearch = { results?: { id: number; name: string; original_name?: string; first_air_date?: string | null; poster_path?: string | null }[] };
 type TmdbFind = {
   tv_results?: { id: number }[];
@@ -326,6 +327,32 @@ export function createCatalog({ db, tmdb, now = () => new Date(), warn = console
     });
   }
 
+  // TMDB en panne (ou liste vide) : la liste en cache sert, même périmée ; sans cache, l'erreur remonte.
+  async function regions(): Promise<string[]> {
+    const rows = db.prepare('SELECT code, fetched_at FROM regions ORDER BY code').all() as { code: string; fetched_at: string }[];
+    const cached = rows.map((r) => r.code);
+    const key = 'regions';
+    if (rows.length && (isFresh(rows[0]?.fetched_at) || coolingDown(key))) return cached;
+    let codes: string[];
+    try {
+      const res = await tmdb.get<TmdbRegions>('/watch/providers/regions');
+      codes = [...new Set((res.results ?? []).map((r) => r.iso_3166_1).filter((c) => /^[A-Z]{2}$/.test(c)))].sort();
+      if (!codes.length) throw new Error('TMDB : liste des pays vide');
+    } catch (err) {
+      if (!rows.length) throw err;
+      failed(key, 'relevé des pays', err);
+      return cached;
+    }
+    failures.delete(key);
+    const at = now().toISOString();
+    transaction(db, () => {
+      db.prepare('DELETE FROM regions').run();
+      const insert = db.prepare('INSERT INTO regions (code, fetched_at) VALUES (?, ?)');
+      for (const c of codes) insert.run(c, at);
+    });
+    return codes;
+  }
+
   async function searchShows(query: string, year?: number): Promise<SearchResult[]> {
     const q = query.replace(/\s+/g, ' ').trim();
     if (!q) return [];
@@ -348,5 +375,5 @@ export function createCatalog({ db, tmdb, now = () => new Date(), warn = console
     return ep ? { showId: ep.show_id, season: ep.season_number, number: ep.episode_number } : null;
   }
 
-  return { ensureShow, refreshShow, ensureProviders, searchShows, findShowByTvdb, findEpisodeByTvdb };
+  return { ensureShow, refreshShow, ensureProviders, regions, searchShows, findShowByTvdb, findEpisodeByTvdb };
 }

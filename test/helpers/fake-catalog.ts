@@ -79,6 +79,15 @@ export class FakeCatalog implements Catalog {
     });
   }
 
+  // Pays JustWatch du faux catalogue.
+  countries = ['BE', 'CA', 'CH', 'FR', 'GB'];
+
+  async regions(): Promise<string[]> {
+    this.calls.push('regions');
+    if (this.offline) throw new Error('réseau coupé');
+    return this.countries;
+  }
+
   async searchShows(query: string): Promise<SearchResult[]> {
     this.calls.push(`searchShows ${query}`);
     if (this.offline) throw new Error('réseau coupé');

@@ -46,7 +46,7 @@ const STATUS: Record<string, ContentfulStatusCode> = {
 
 const noCatalog = (): Promise<never> => Promise.reject(new UpstreamError('catalogue non configuré'));
 const unavailableCatalog: Catalog = {
-  ensureShow: noCatalog, refreshShow: noCatalog, ensureProviders: noCatalog, searchShows: noCatalog, findShowByTvdb: noCatalog, findEpisodeByTvdb: noCatalog,
+  ensureShow: noCatalog, refreshShow: noCatalog, ensureProviders: noCatalog, regions: noCatalog, searchShows: noCatalog, findShowByTvdb: noCatalog, findEpisodeByTvdb: noCatalog,
 };
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);

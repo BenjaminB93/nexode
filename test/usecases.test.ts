@@ -359,11 +359,14 @@ test('réglages : valeurs par défaut, écriture partielle, seuil appliqué aux 
   const { db, catalog, ctx } = setup();
   assert.deepEqual(getSettings(ctx),
     { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
-  assert.deepEqual(updateSettings(ctx, { notifOn: false, notifHour: 0 }),
+  assert.deepEqual(await updateSettings(ctx, { notifOn: false, notifHour: 0 }),
     { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
-  assert.deepEqual(updateSettings(ctx, { country: 'BE', shelveAfterDays: 90 }),
+  assert.deepEqual(await updateSettings(ctx, { country: 'BE', shelveAfterDays: 90 }),
     { username: 'dev', role: 'membre', country: 'BE', shelveAfterDays: 90, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
-  assert.equal(updateSettings(ctx, {}).country, 'BE');
+  assert.equal((await updateSettings(ctx, {})).country, 'BE');
+  // Pays hors de la liste JustWatch : refusé avant toute écriture.
+  await assert.rejects(updateSettings(ctx, { country: 'ZZ', shelveAfterDays: 15 }), { code: 'invalid_input', field: 'country' });
+  assert.equal(getSettings(ctx).shelveAfterDays, 90);
 
   // LONGUE ajoutée il y a ~45 jours sans épisode vu : de côté à 30 j, en cours à 90 j.
   await setRelation(at(db, catalog, '2026-09-29T10:00:00.000Z'), LONGUE.id, 'on');
