@@ -25,10 +25,20 @@ Prérequis :
 - Box : ports TCP 80 et 443 redirigés vers le Pi (UDP 443 en plus pour HTTP/3, facultatif).
 - Le nom de domaine (ex. `series.exemple.fr`) pointe vers l'adresse publique de la box.
 
+Le code arrive sur le Pi par `git push` depuis le PC : `~/series` sur le Pi est un dépôt git dont les fichiers suivent chaque push (`updateInstead`). Le Pi n'accède à aucun dépôt distant ; `.env` et `data/`, ignorés par git, ne sont jamais touchés par un push.
+
 Première installation :
 
 ```sh
-git clone <adresse du dépôt> series && cd series
+# Sur le Pi
+git init -b main ~/series && cd ~/series
+git config receive.denyCurrentBranch updateInstead
+
+# Sur le PC
+git remote add pi <utilisateur>@<IP du Pi>:series
+git push pi main
+
+# Sur le Pi, dans ~/series
 mkdir data && sudo chown 1000:1000 data     # le conteneur tourne en utilisateur node (uid 1000)
 cp .env.example .env && chmod 600 .env
 nano .env                                   # SITE_DOMAIN=series.exemple.fr et TMDB_READ_TOKEN=…
@@ -41,9 +51,14 @@ docker compose exec app node src/cli/create-admin.ts camille
 
 ## Mettre à jour
 
+Depuis le PC, après commit :
+
 ```sh
-git pull && docker compose up -d --build
+git push pi main
+ssh <utilisateur>@<IP du Pi> "cd series && docker compose up -d --build"
 ```
+
+Le push est refusé si un fichier suivi a été modifié directement sur le Pi (rien n'est écrasé).
 
 Les migrations de la base s'appliquent au démarrage. Si `Caddyfile` a changé : `docker compose restart caddy` (le fichier est monté seul, le conteneur garde sinon l'ancienne version). Les anciennes images s'accumulent : `docker image prune -f` de temps en temps.
 
