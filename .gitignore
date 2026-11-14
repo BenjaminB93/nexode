@@ -17,3 +17,9 @@ node_modules/
 # Variantes locales de .env
 .env.*
 !.env.example
+
+# Tests
+prototype/
+
+# Notes de travail locales (environnement perso) : jamais dans le dépôt public
+CLAUDE.md
