@@ -1,4 +1,21 @@
-/* Appli mobile plein écran. Toutes les couleurs passent par ces variables : aucune couleur en dur dans les vues. */
+/* Appli mobile plein écran. Toutes les couleurs passent par ces variables : aucune couleur en dur dans les vues.
+   Rôles, règles et contrastes : docs/charte.md (vérifiés par test/front-contrast.test.ts). */
+
+/* Polices servies par l'appli (OFL 1.1, public/vendor/fonts), variables : un fichier couvre toutes les graisses.
+   latin couvre le français ; latin-ext n'est téléchargé que si un texte contient un de ses caractères. */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/vendor/fonts/inter-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/vendor/fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
+  src: url('/vendor/fonts/space-grotesk-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
+  src: url('/vendor/fonts/space-grotesk-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
 :root {
   color-scheme: dark;
   --on-accent: #1A1406; --ok-line: #2E5E4C; --on-ok: #0E1014;
@@ -6,9 +23,9 @@
   --hist: #8A929E; --hist-strong: #A3AAB5; --hist-check: #5C8F7C; --hist-bg: #13161C;
   --toast: #2A2F3A; --sheet: #1A1E26; --backdrop: rgba(5, 6, 8, 0.66); --shadow: rgba(0, 0, 0, 0.45); --knob: #FFFFFF;
   --bg: #0E1014; --bar: #12151A; --card: #171A21; --cardline: #232833; --line: #1F232C;
-  --fg: #ECEEF1; --soft: #C9CED6; --muted: #9BA3AF; --faint: #7D8590; --dim: #6B7380;
-  --accent: #F2B544; --accent-bg: #2A2414; --ok: #3CCB9B; --ok-strong: #1F7A5A; --ok-bg: #123328; --ok-fg: #9FD9C2;
-  --danger: #F08A7E; --on-danger: #FFFFFF; --on-armed: #FFFFFF;
+  --fg: #ECEEF1; --soft: #C9CED6; --muted: #9BA3AF; --faint: #808892; --dim: #6B7380;
+  --accent: #F2B544; --accent-solid: #F2B544; --accent-bg: #2A2414; --ok: #3CCB9B; --ok-strong: #1F7A5A; --ok-bg: #123328; --ok-fg: #9FD9C2;
+  --danger: #F08A7E; --on-danger: #2A0F0B; --on-armed: #FFFFFF;
   --display: 'Space Grotesk', Inter, system-ui, sans-serif;
   --text: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -18,10 +35,10 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --bg: #F5F6F8; --bar: #FFFFFF; --card: #FFFFFF; --cardline: #E2E5EA; --line: #E4E7EB;
-  --fg: #15181D; --soft: #39404B; --muted: #5B6370; --faint: #6E7682; --dim: #808894;
-  --accent: #B5760A; --accent-bg: #FAEFD8; --on-accent: #FFFFFF;
-  --ok: #1E9E74; --ok-strong: #1E9E74; --ok-bg: #DCF2E9; --ok-fg: #166A4F; --ok-line: #A6D9C4; --on-ok: #FFFFFF;
-  --danger: #C4453A;
+  --fg: #15181D; --soft: #39404B; --muted: #5B6370; --faint: #666D79; --dim: #808894;
+  --accent: #936008; --accent-solid: #F2B544; --accent-bg: #FAEFD8; --on-accent: #1A1406;
+  --ok: #187E5D; --ok-strong: #187E5D; --ok-bg: #DCF2E9; --ok-fg: #166A4F; --ok-line: #A6D9C4; --on-ok: #FFFFFF;
+  --danger: #C4453A; --on-danger: #FFFFFF;
   --line2: #D3D8DF; --line-strong: #C0C6CF; --chip: #ECEEF2; --chip2: #F0F1F4; --tick-off: #B3B9C2;
   --hist: #6A727E; --hist-strong: #4D5562; --hist-check: #3F9C7A; --hist-bg: #FFFFFF;
   --toast: #FFFFFF; --sheet: #FFFFFF; --backdrop: rgba(20, 23, 28, 0.35); --shadow: rgba(20, 23, 28, 0.18); --knob: #FFFFFF;
@@ -45,7 +62,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Le contenu défile : ses blocs gardent leur hauteur (sinon un bloc en overflow: hidden se fait écraser quand l'écran est court). */
 .body > * { flex-shrink: 0; }
 .eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
-.daylabel { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.daylabel { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
 .reveal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 13px; font-weight: 700; }
 .swbtn { position: absolute; inset: 0; width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 12px; text-align: left; color: inherit; font: inherit; cursor: pointer; touch-action: pan-y; }
 .card { border-radius: 16px; background: var(--card); border: 1px solid var(--cardline); }
@@ -64,9 +81,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .opt[aria-checked="true"] { background: var(--chip); color: var(--accent); font-weight: 700; }
 .hourgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .hour { height: 44px; border: 1px solid var(--cardline); border-radius: 10px; background: transparent; color: var(--soft); font: 600 13px var(--text); cursor: pointer; }
-.hour[aria-checked="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.hour[aria-checked="true"] { border-color: var(--accent-solid); background: var(--accent-solid); color: var(--on-accent); }
 .btn { height: 50px; border-radius: 14px; font: 700 15px var(--text); cursor: pointer; }
-.btn-primary { border: 0; background: var(--accent); color: var(--on-accent); }
+.btn-primary { border: 0; background: var(--accent-solid); color: var(--on-accent); }
 .btn-ghost { border: 1px solid var(--line-strong); background: transparent; color: var(--fg); }
 .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: calc(72px + var(--safe-bottom)); box-sizing: border-box; padding-bottom: var(--safe-bottom); border-top: 1px solid var(--line); background: var(--bar); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .tab { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 11px var(--text); cursor: pointer; }

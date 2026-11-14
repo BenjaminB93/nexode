@@ -62,7 +62,7 @@ function matchCard(app, x, m) {
     </span>
     <div role="radiogroup" aria-label=${exportLabel(m)}>
       ${cands.map((/** @type {any} */ c) => choiceRow(cur === c.id, poster(c.posterPath, 34, 51, 5, 'flex: none'), c.name, candSub(c), () => app.chooseImport(m.key, c.id), () => app.openShow(c)))}
-      ${choiceRow(cur === null, html`<span style="flex: none; width: 34px; height: 51px; display: flex; align-items: center; justify-content: center; color: var(--dim)">—</span>`,
+      ${choiceRow(cur === null, html`<span style="flex: none; width: 34px; height: 51px; display: flex; align-items: center; justify-content: center; color: var(--faint)">—</span>`,
         'Ne pas importer', '', () => app.chooseImport(m.key, null), null)}
     </div>
     ${searching ? html`<div style="display: flex; flex-direction: column; gap: 6px; padding-top: 6px">

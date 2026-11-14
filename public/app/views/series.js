@@ -18,7 +18,7 @@ export function viewSeries(app, st) {
   const followButton = (r) => {
     const on = r.relation !== 'none';
     return html`<button type="button" class="press" onClick=${() => app.setRelation(r.id, on ? 'none' : 'on')}
-      style="flex: none; height: 44px; min-width: 92px; padding: 0 12px; border-radius: 12px; border: ${on ? '1px solid var(--ok-line)' : '0'}; background: ${on ? 'var(--ok-bg)' : 'var(--accent)'}; color: ${on ? 'var(--ok-fg)' : 'var(--on-accent)'}; font: 700 13px var(--text); cursor: pointer">${on ? 'Suivie' : '+ Suivre'}</button>`;
+      style="flex: none; height: 44px; min-width: 92px; padding: 0 12px; border-radius: 12px; border: ${on ? '1px solid var(--ok-line)' : '0'}; background: ${on ? 'var(--ok-bg)' : 'var(--accent-solid)'}; color: ${on ? 'var(--ok-fg)' : 'var(--on-accent)'}; font: 700 13px var(--text); cursor: pointer">${on ? 'Suivie' : '+ Suivre'}</button>`;
   };
   /** @param {any} r */
   const statusChip = (r) => {

@@ -51,7 +51,7 @@ export function viewSeason(app, st, top) {
               <div class="sw" onPointerDown=${sw.down} onPointerMove=${sw.move} onPointerUp=${sw.up} onPointerCancel=${sw.cancel}
                 style="position: absolute; inset: 0; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--line); background: var(--hist-bg); display: flex; align-items: center; touch-action: pan-y; transform: translateX(${sw.dx}px); transition: ${sw.tr}">
                 <button type="button" onClick=${app.tap(() => app.openEp({ id, name }, ep))} style="flex: 1; min-width: 0; height: 60px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; display: flex; align-items: center; gap: 12px; padding: 0 4px 0 14px; cursor: pointer">
-                  <span style="flex: none; width: 34px; font-size: 13px; font-weight: 700; color: ${ep.aired ? 'var(--accent)' : 'var(--dim)'}">E${ep.number}</span>
+                  <span style="flex: none; width: 34px; font-size: 13px; font-weight: 700; color: ${ep.aired ? 'var(--accent)' : 'var(--faint)'}">E${ep.number}</span>
                   <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
                     <span class="ell" style="font-size: 14px; font-weight: 500; color: ${ep.aired ? 'var(--fg)' : 'var(--faint)'}">${epTitle(ep)}${ep.titleIsVo ? ' (VO)' : ''}</span>
                     <span style="font-size: 12px; color: var(--faint)">${sub}</span>

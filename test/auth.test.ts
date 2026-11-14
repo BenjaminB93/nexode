@@ -793,6 +793,22 @@ test('fichiers statiques : revalidés à chaque chargement, 304 si inchangés', 
   assert.equal(again.headers.get('cache-control'), 'no-cache');
 });
 
+test('polices : chaque fichier cité par style.css et préchargé par index.html est servi en font/woff2', async () => {
+  const s = setup();
+  const read = async (p: string) => (await s.app.request(p)).text();
+  const fromCss = [...(await read('/app/style.css')).matchAll(/url\('([^']+\.woff2)'\)/g)].map((m) => m[1] as string);
+  const preloaded = [...(await read('/')).matchAll(/href="([^"]+\.woff2)"/g)].map((m) => m[1] as string);
+  assert.equal(fromCss.length, 4);
+  assert.equal(preloaded.length, 2);
+  assert.ok(preloaded.every((u) => fromCss.includes(u)), 'préchargement d’un fichier absent de style.css');
+  const urls = new Set(fromCss);
+  for (const u of urls) {
+    const res = await s.app.request(u);
+    assert.equal(res.status, 200, u);
+    assert.equal(res.headers.get('content-type'), 'font/woff2', u);
+  }
+});
+
 test('scrypt : paramètres dans la chaîne, sel aléatoire, \'!\' jamais valide', async () => {
   assert.match(PW_HASH, /^scrypt\$16384\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
   assert.notEqual(await hashPassword(PW), PW_HASH);
