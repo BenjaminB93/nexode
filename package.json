@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@hono/node-server": "2.1.8",
-    "hono": "4.13.18"
+    "hono": "4.13.18",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@types/web-push": "3.6.4",
     "typescript": "7.0.2"
   }
 }

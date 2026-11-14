@@ -1,6 +1,6 @@
 import { type Context, Hono } from 'hono';
 import type { Db } from '../db/index.ts';
-import type { Catalog } from '../ports.ts';
+import type { Catalog, Push } from '../ports.ts';
 import { ASSIGNABLE_ROLES, usernameKey } from '../domain/accounts.ts';
 import { RELATIONS } from '../domain/series.ts';
 import { deleteMe, exportData } from '../usecases/account.ts';
@@ -10,6 +10,8 @@ import { parseImportFiles } from '../domain/import-files.ts';
 import { applyImport, matchShows } from '../usecases/import.ts';
 import { createInvite, listInvites, revokeInvite } from '../usecases/invites.ts';
 import { HISTORY_PAGE, decodeCursor, history, myShows, shelf, timeline } from '../usecases/lists.ts';
+import { tokenHash } from '../infra/secrets.ts';
+import { requirePush, sendTest, subscribe, unsubscribe } from '../usecases/push.ts';
 import { setRelation } from '../usecases/relation.ts';
 import { search } from '../usecases/search.ts';
 import { SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, listCountries, updateSettings } from '../usecases/settings.ts';
@@ -19,8 +21,8 @@ import { type AuthEnv, type Limits, clearSessionCookie } from './auth.ts';
 import { counting } from './rate-limit.ts';
 import { MAX_BATCH, bool, idList, instant, intOneOf, intRange, jsonBody, jsonId, noBody, oneOf, positiveId, str } from './validate.ts';
 
-// siteUrl : origine publique du site (liens d'invitation et de réinitialisation).
-export type ApiDeps = { db: Db; catalog: Catalog; now: () => Date; siteUrl: string; secureCookie: boolean; limits: Limits };
+// siteUrl : origine publique du site (liens d'invitation et de réinitialisation). push absent : notifications désactivées (503).
+export type ApiDeps = { db: Db; catalog: Catalog; push?: Push; now: () => Date; siteUrl: string; secureCookie: boolean; limits: Limits };
 
 // Routes JSON authentifiées (montées sous /api, après le middleware de session). Les écritures renvoient l'état recalculé de la série concernée.
 export function createApi(deps: ApiDeps): Hono<AuthEnv> {
@@ -37,11 +39,10 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
   // Champs facultatifs ; tout est validé avant la moindre écriture.
   api.patch('/me', async (c) => {
     const ctx = ctxOf(c);
-    const body = await jsonBody(c, ['country', 'shelveAfterDays', 'notifOn', 'notifHour']);
+    const body = await jsonBody(c, ['country', 'shelveAfterDays', 'notifHour']);
     const patch: SettingsPatch = {};
     if (body.country !== undefined) patch.country = str(body.country, 'country', 2);
     if (body.shelveAfterDays !== undefined) patch.shelveAfterDays = intOneOf(body.shelveAfterDays, SHELVE_AFTER_DAYS, 'shelveAfterDays');
-    if (body.notifOn !== undefined) patch.notifOn = bool(body.notifOn, 'notifOn');
     if (body.notifHour !== undefined) patch.notifHour = intRange(body.notifHour, 0, 23, 'notifHour');
     return c.json(await updateSettings(ctx, patch));
   });
@@ -66,6 +67,41 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Cache-Control': 'no-store',
     });
+  });
+
+  // ---------- notifications (par appareil) ----------
+
+  api.get('/push/key', (c) => {
+    ctxOf(c);
+    return c.json({ publicKey: requirePush(deps.push).publicKey });
+  });
+
+  // Corps : PushSubscription.toJSON() du navigateur. Rattaché à la session courante.
+  api.put('/push/subscription', async (c) => {
+    const ctx = ctxOf(c);
+    requirePush(deps.push);
+    const body = await jsonBody(c, ['endpoint', 'expirationTime', 'keys']);
+    const keys = body.keys;
+    if (keys === null || typeof keys !== 'object' || Array.isArray(keys)) throw new InvalidInputError('keys');
+    const { p256dh, auth } = keys as Record<string, unknown>;
+    subscribe(ctx, tokenHash((c.get('session') as { token: string }).token), {
+      endpoint: str(body.endpoint, 'endpoint', 1000), p256dh: str(p256dh, 'keys', 200), auth: str(auth, 'keys', 100),
+    });
+    return c.body(null, 204);
+  });
+
+  api.delete('/push/subscription', async (c) => {
+    const ctx = ctxOf(c);
+    const body = await jsonBody(c, ['endpoint']);
+    unsubscribe(ctx, str(body.endpoint, 'endpoint', 1000));
+    return c.body(null, 204);
+  });
+
+  api.post('/push/test', async (c) => {
+    const ctx = ctxOf(c);
+    const push = requirePush(deps.push);
+    const body = await jsonBody(c, ['endpoint']);
+    return c.json(await sendTest(ctx, push, str(body.endpoint, 'endpoint', 1000)));
   });
 
   // ---------- parrainages ----------

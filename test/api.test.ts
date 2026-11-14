@@ -188,22 +188,21 @@ test('GET /api/me : forme et valeurs par défaut', async () => {
   const { call } = setup();
   const r = await call('GET', '/api/me');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(r.body, { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' });
 });
 
 test('PATCH /api/me : champs facultatifs, persistance, réponse = GET /api/me', async () => {
   const { call } = setup();
-  const a = await call('PATCH', '/api/me', { country: 'CH', notifOn: false });
+  const a = await call('PATCH', '/api/me', { country: 'CH' });
   assert.equal(a.status, 200);
-  assert.deepEqual(a.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 30, notifOn: false, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(a.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' });
   const b = await call('PATCH', '/api/me', { shelveAfterDays: 15, notifHour: 23 });
-  assert.deepEqual(b.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 15, notifOn: false, notifHour: 23, timezone: 'Europe/Paris' });
+  assert.deepEqual(b.body, { username: 'dev', role: 'membre', country: 'CH', shelveAfterDays: 15, notifHour: 23, timezone: 'Europe/Paris' });
   assert.deepEqual((await call('PATCH', '/api/me', {})).body, b.body);
   assert.deepEqual((await call('GET', '/api/me')).body, b.body);
   for (const country of ['FR', 'BE', 'CH', 'CA', 'GB']) assert.equal((await call('PATCH', '/api/me', { country })).body.country, country);
   for (const d of [15, 30, 60, 90]) assert.equal((await call('PATCH', '/api/me', { shelveAfterDays: d })).body.shelveAfterDays, d);
   assert.equal((await call('PATCH', '/api/me', { notifHour: 0 })).body.notifHour, 0);
-  assert.equal((await call('PATCH', '/api/me', { notifOn: true })).body.notifOn, true);
 });
 
 test('GET /api/countries : liste JustWatch du catalogue ; catalogue indisponible → 502', async () => {
@@ -229,8 +228,7 @@ test('PATCH /api/me : validation → 400 sans écriture partielle', async () => 
   await bad({ shelveAfterDays: 45 }, 'shelveAfterDays');
   await bad({ shelveAfterDays: '30' }, 'shelveAfterDays');
   await bad({ shelveAfterDays: 0 }, 'shelveAfterDays');
-  await bad({ notifOn: 'true' }, 'notifOn');
-  await bad({ notifOn: 1 }, 'notifOn');
+  await bad({ notifOn: true }, 'notifOn');   // activation par appareil (/api/push/subscription)
   await bad({ notifHour: 24 }, 'notifHour');
   await bad({ notifHour: -1 }, 'notifHour');
   await bad({ notifHour: 9.5 }, 'notifHour');

@@ -1,4 +1,5 @@
 // Contrats entre couches. Le catalogue (cache TMDB, src/infra/catalog.ts) est consommé par les use cases.
+import type { NotifPayload } from './domain/notifications.ts';
 
 export type SearchResult = {
   id: number;                 // id TMDB
@@ -23,4 +24,12 @@ export interface Catalog {
   findShowByTvdb(tvdbId: number): Promise<number | null>;
   // Position TMDB d'un épisode d'après son id TheTVDB ; null si inconnu.
   findEpisodeByTvdb(tvdbEpisodeId: number): Promise<{ showId: number; season: number; number: number } | null>;
+}
+
+// Envoi Web Push (src/infra/webpush.ts). gone : abonnement refusé définitivement (404/410), à supprimer.
+export type PushResult = 'sent' | 'gone' | 'failed';
+
+export interface Push {
+  publicKey: string;        // clé VAPID publique (applicationServerKey du navigateur)
+  send(sub: { endpoint: string; p256dh: string; auth: string }, payload: NotifPayload): Promise<PushResult>;
 }

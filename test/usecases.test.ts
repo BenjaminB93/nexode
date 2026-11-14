@@ -358,11 +358,11 @@ test('À regarder : upNext = épisodes sortis non vus après next, même forme q
 test('réglages : valeurs par défaut, écriture partielle, seuil appliqué aux listes', async () => {
   const { db, catalog, ctx } = setup();
   assert.deepEqual(getSettings(ctx),
-    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
-  assert.deepEqual(await updateSettings(ctx, { notifOn: false, notifHour: 0 }),
-    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(await updateSettings(ctx, { notifHour: 0 }),
+    { username: 'dev', role: 'membre', country: 'FR', shelveAfterDays: 30, notifHour: 0, timezone: 'Europe/Paris' });
   assert.deepEqual(await updateSettings(ctx, { country: 'BE', shelveAfterDays: 90 }),
-    { username: 'dev', role: 'membre', country: 'BE', shelveAfterDays: 90, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+    { username: 'dev', role: 'membre', country: 'BE', shelveAfterDays: 90, notifHour: 0, timezone: 'Europe/Paris' });
   assert.equal((await updateSettings(ctx, {})).country, 'BE');
   // Pays hors de la liste JustWatch : refusé avant toute écriture.
   await assert.rejects(updateSettings(ctx, { country: 'ZZ', shelveAfterDays: 15 }), { code: 'invalid_input', field: 'country' });

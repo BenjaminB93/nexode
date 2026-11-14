@@ -419,12 +419,13 @@ test('Écrans de compte : chaque état se construit sans erreur (chargement, don
     { id: 1, username: 'Ben', role: 'admin', createdAt: '2026-11-01T10:00:00Z', invitedBy: null, invitedByDeleted: false, followedCount: 3, watchedCount: 40 },
     { id: 2, username: 'Léa', role: 'membre', createdAt: '2026-11-02T10:00:00Z', invitedBy: null, invitedByDeleted: true, followedCount: 0, watchedCount: 0 },
   ];
-  const me = { username: 'Ben', role: 'admin', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' };
+  const me = { username: 'Ben', role: 'admin', country: 'FR', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' };
   for (const s of [{ ...st, invites: null, users: null }, { ...st, invites: null, users: null, errs: { invites: true, users: true } }, { ...st, invites, users }]) {
     assert.ok(V.viewInvites(app, s));
     assert.ok(V.viewAdmin(app, s));
     assert.ok(viewProfil(app, { ...s, me }));
     assert.ok(viewProfil(app, { ...s, me: null }));
+    for (const push of [null, 'on', 'off', 'denied', 'install', 'unsupported', 'unavailable']) assert.ok(viewProfil(app, { ...s, me, push, pushBusy: false }));
   }
   assert.ok(V.linkSheetView(app, { title: 'T', sub: 's', url: 'https://x/invitation/a', inviteId: 1, copied: 'ok' }));
   assert.ok(V.linkSheetView(app, { title: 'T', sub: 's', url: null, inviteId: 1 }));
@@ -583,4 +584,29 @@ test('Droits retirés en cours d’utilisation (403 forbidden) : rôle relu, éc
   assert.deepEqual(app.state.stack, []);
   assert.equal(app.state.creatingInvite, false);
   assert.ok(!app.toasts.some((x: any) => x.text === 'Création impossible'));
+});
+
+test('notification touchée : cible lue (adresse ou message), fiche épisode ouverte une fois la session ouverte', async () => {
+  const P = await load('../public/app/push.js');
+  const target = { show: 12, name: 'Andor', season: 2, number: 3, ep: 45 };
+  assert.deepEqual(P.notifTarget(new URLSearchParams('show=12&name=Andor&season=2&number=3&ep=45')), target);
+  assert.deepEqual(P.notifTarget({ show: 12, name: 'Andor', season: 2, number: 3, ep: 45 }), target);
+  assert.equal(P.notifTarget(new URLSearchParams('')), null);
+  assert.equal(P.notifTarget(new URLSearchParams('show=12&season=2&number=3&ep=abc')), null);
+  assert.equal(P.pushSupported(), false);   // Node : pas de service worker
+
+  const app = makeApp();
+  // Page de connexion affichée : gardée pour après la connexion.
+  app.state.auth = { screen: 'login' };
+  app.openNotified(target);
+  assert.deepEqual(app.state.stack, []);
+  assert.deepEqual(app.pendingOpen, target);
+  app.state.auth = null;
+  app.state.me = { username: 'Ben', role: 'membre' };
+  app.state.picker = { title: 'x' };
+  app.initPush = () => {};
+  app.signedIn();
+  assert.deepEqual(app.state.stack, [{ type: 'episode', show: 12, name: 'Andor', season: 2, number: 3, ep: 45 }]);
+  assert.equal(app.state.picker, null);
+  assert.equal(app.pendingOpen, null);
 });

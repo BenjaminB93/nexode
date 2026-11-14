@@ -50,7 +50,7 @@ export function countAdmins(db: Db): number {
 
 // Efface le compte et tout ce qui lui appartient. Ses invitations restent (created_by / used_by passent à NULL).
 export function deleteUserAndData(db: Db, id: number): void {
-  for (const table of ['watched', 'user_shows', 'sessions', 'reset_tokens']) db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id);
+  for (const table of ['watched', 'user_shows', 'push_subscriptions', 'notifications_sent', 'sessions', 'reset_tokens']) db.prepare(`DELETE FROM ${table} WHERE user_id = ?`).run(id);
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
 }
 
@@ -199,21 +199,21 @@ export function getExportWatched(db: Db, userId: number): ExportWatchedRow[] {
 // ---------- réglages ----------
 
 export type UserSettingsRow = {
-  username: string; role: Role; country: string; shelveAfterDays: number; notifOn: number; notifHour: number; timezone: string;
+  username: string; role: Role; country: string; shelveAfterDays: number; notifHour: number; timezone: string;
 };
 
 export function getUserSettings(db: Db, id: number): UserSettingsRow | undefined {
-  return one<UserSettingsRow>(db, `SELECT username, role, country, shelve_after_days AS shelveAfterDays, notif_on AS notifOn,
+  return one<UserSettingsRow>(db, `SELECT username, role, country, shelve_after_days AS shelveAfterDays,
     notif_hour AS notifHour, timezone FROM users WHERE id = ?`, id);
 }
 
 // Champ null = inchangé.
 export function updateUserSettings(db: Db, id: number, s: {
-  country: string | null; shelveAfterDays: number | null; notifOn: number | null; notifHour: number | null;
+  country: string | null; shelveAfterDays: number | null; notifHour: number | null;
 }): void {
   db.prepare(`UPDATE users SET country = coalesce(?, country), shelve_after_days = coalesce(?, shelve_after_days),
-    notif_on = coalesce(?, notif_on), notif_hour = coalesce(?, notif_hour) WHERE id = ?`)
-    .run(s.country, s.shelveAfterDays, s.notifOn, s.notifHour, id);
+    notif_hour = coalesce(?, notif_hour) WHERE id = ?`)
+    .run(s.country, s.shelveAfterDays, s.notifHour, id);
 }
 
 // ---------- catalogue ----------
@@ -356,4 +356,63 @@ export function getHistory(db: Db, userId: number, before: HistoryCursor | null,
     WHERE w.user_id = ? AND (? IS NULL OR w.watched_at < ? OR (w.watched_at = ? AND w.episode_id < ?))
     ORDER BY w.watched_at DESC, w.episode_id DESC LIMIT ?`,
     userId, before?.watchedAt ?? null, before?.watchedAt ?? null, before?.watchedAt ?? null, before?.episodeId ?? null, limit);
+}
+
+// ---------- notifications push ----------
+
+export type PushSubscriptionRow = { endpoint: string; p256dh: string; auth: string };
+
+// Un endpoint appartient au dernier compte (et à la dernière session) qui l'a enregistré.
+export function upsertPushSubscription(db: Db, s: {
+  endpoint: string; userId: number; sessionHash: string; p256dh: string; auth: string; nowIso: string;
+}): void {
+  db.prepare(`INSERT INTO push_subscriptions (endpoint, user_id, session_hash, p256dh, auth, created_at, seen_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, session_hash = excluded.session_hash,
+      p256dh = excluded.p256dh, auth = excluded.auth, seen_at = excluded.seen_at,
+      created_at = CASE WHEN user_id = excluded.user_id THEN created_at ELSE excluded.created_at END`)
+    .run(s.endpoint, s.userId, s.sessionHash, s.p256dh, s.auth, s.nowIso, s.nowIso);
+}
+
+export function getPushSubscription(db: Db, userId: number, endpoint: string): PushSubscriptionRow | undefined {
+  return one<PushSubscriptionRow>(db, 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? AND endpoint = ?', userId, endpoint);
+}
+
+export function listPushSubscriptions(db: Db, userId: number): PushSubscriptionRow[] {
+  return all<PushSubscriptionRow>(db, 'SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? ORDER BY created_at', userId);
+}
+
+export function deleteUserPushSubscription(db: Db, userId: number, endpoint: string): void {
+  db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').run(userId, endpoint);
+}
+
+// Abonnement refusé par le service push (appli désinstallée, permission retirée).
+export function deletePushEndpoint(db: Db, endpoint: string): void {
+  db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
+}
+
+// Comptes ayant au moins un appareil abonné.
+export function listPushUsers(db: Db): (UserRow & { notifHour: number })[] {
+  return all<UserRow & { notifHour: number }>(db, `SELECT ${USER_COLS}, u.notif_hour AS notifHour FROM users u
+    WHERE EXISTS (SELECT 1 FROM push_subscriptions p WHERE p.user_id = u.id) ORDER BY u.id`);
+}
+
+export type NotifEpisodeRow = { id: number; showId: number; season: number; number: number; title: string | null };
+
+// Épisodes sortis ce jour-là des séries de user_shows, non vus par l'utilisateur, hors séries déjà notifiées ce jour.
+export function getNotifiableEpisodes(db: Db, userId: number, day: string): NotifEpisodeRow[] {
+  return all<NotifEpisodeRow>(db, `SELECT e.id, e.show_id AS showId, e.season, e.number, e.title
+    FROM user_shows us JOIN episodes e ON e.show_id = us.show_id
+    WHERE us.user_id = ? AND e.air_date = ? AND e.removed_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM watched w WHERE w.user_id = us.user_id AND w.episode_id = e.id)
+      AND NOT EXISTS (SELECT 1 FROM notifications_sent n WHERE n.user_id = us.user_id AND n.day = ? AND n.show_id = e.show_id)
+    ORDER BY e.show_id, e.season, e.number`, userId, day, day);
+}
+
+export function insertNotificationSent(db: Db, userId: number, showId: number, day: string, nowIso: string): void {
+  db.prepare('INSERT OR IGNORE INTO notifications_sent (user_id, show_id, day, sent_at) VALUES (?, ?, ?, ?)').run(userId, showId, day, nowIso);
+}
+
+export function deleteNotificationsSentBefore(db: Db, day: string): void {
+  db.prepare('DELETE FROM notifications_sent WHERE day < ?').run(day);
 }

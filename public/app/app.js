@@ -7,6 +7,7 @@ import { api, isAbort, onUnauthorized } from './api.js';
 import { THEMES, compareEp, dayOf, fShort, inDays, localDay, plural } from './format.js';
 import { authErrorField, authErrorText, canInvite, cleanName, parseAuthRoute } from './auth.js';
 import * as S from './store.js';
+import * as P from './push.js';
 import { I } from './icons.js';
 import { confirmSheet, pickerSheet } from './components.js';
 import { viewEncours } from './views/encours.js';
@@ -82,6 +83,7 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
  *   account: number | null, exportSheet: { data: any } | null,
  *   delSelf: DelSelf | null, imp: ImportState,
+ *   push: import('./push.js').PushState | null, pushBusy: boolean,
  * }} State
  */
 
@@ -121,6 +123,7 @@ function initialState(theme) {
     auth: null, form: emptyForm(),
     invites: null, users: null, creatingInvite: false, resetBusy: false,
     linkSheet: null, account: null, exportSheet: null, delSelf: null, imp: emptyImport(),
+    push: null, pushBusy: false,
   };
 }
 
@@ -200,6 +203,13 @@ export class App extends Component {
     this.onTouchEnd = () => this.pullEnd();
     this.onWheel = (/** @type {WheelEvent} */ ev) => this.handleWheel(ev);
     this.onPop = (/** @type {PopStateEvent} */ ev) => this.handlePop(ev);
+    // Notification touchée alors que l'appli est ouverte : le service worker transmet la cible.
+    this.onWorkerMessage = (/** @type {MessageEvent} */ ev) => {
+      const t = ev.data && ev.data.type === 'open-episode' ? P.notifTarget(ev.data.open || {}) : null;
+      if (t) this.openNotified(t);
+    };
+    /** @type {ReturnType<typeof P.notifTarget>} épisode à ouvrir dès la session ouverte (notification touchée) */
+    this.pendingOpen = null;
     this.onSearchInput = (/** @type {Event} */ ev) => this.searchInput(/** @type {HTMLInputElement} */ (ev.currentTarget).value);
     /** L'entrée d'historique de la feuille ouverte est en place. */
     this.sheetEntry = false;
@@ -222,6 +232,10 @@ export class App extends Component {
   }
 
   componentDidMount() {
+    // Ouvert par une notification (/?show=…&ep=…) : l'épisode s'ouvrira par-dessus la timeline, l'adresse redevient '/'.
+    this.pendingOpen = P.notifTarget(new URLSearchParams(location.search));
+    if (this.pendingOpen) { try { history.replaceState(history.state, '', '/'); } catch { /* adresse inchangée */ } }
+    if (P.pushSupported()) navigator.serviceWorker.addEventListener('message', this.onWorkerMessage);
     this.mqLight = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
     if (this.mqLight) this.mqLight.addEventListener('change', () => { if (this.state.theme === 'system') this.applyTheme('system'); });
     this.applyTheme(this.state.theme);
@@ -242,12 +256,13 @@ export class App extends Component {
     if (route) { this.openAuthRoute(route); return; }
     // Sans session, /api/me et la timeline répondent 401 : la connexion s'affiche.
     this.pendingScroll = 'anchor';
-    this.loadMe();
+    this.loadMe().then((ok) => { if (ok && this.state.me) this.signedIn(); });
     this.loadTab('encours');
   }
 
   componentWillUnmount() {
     window.removeEventListener('popstate', this.onPop);
+    if (P.pushSupported()) navigator.serviceWorker.removeEventListener('message', this.onWorkerMessage);
     onUnauthorized(null);
   }
 
@@ -842,6 +857,7 @@ export class App extends Component {
     this.pendingScroll = 'anchor';
     this.loadTab('encours');
     if (text) this.toast(text);
+    this.signedIn();
   }
 
   // Les écritures en attente partent d'abord (sinon un swipe juste avant serait perdu).
@@ -849,9 +865,90 @@ export class App extends Component {
     if (this.loggingOut) return;
     this.loggingOut = true;
     this.afterWrites(() => {
-      api.logout().then(() => this.signedOut(), (e) => this.failToast(e, 'Déconnexion impossible'))
+      // L'appareil cesse de recevoir les notifications du compte (le serveur les retire aussi avec la session).
+      P.forgetPush().catch(() => {}).then(() => api.logout()).then(() => this.signedOut(), (e) => this.failToast(e, 'Déconnexion impossible'))
         .finally(() => { this.loggingOut = false; });
     });
+  }
+
+  // ---------- notifications ----------
+  /** Session ouverte (démarrage ou connexion) : épisode d'une notification touchée, état des notifications de l'appareil. */
+  signedIn() {
+    const t = this.pendingOpen;
+    this.pendingOpen = null;
+    if (t) this.openNotified(t);
+    this.initPush();
+  }
+
+  /** Fiche de l'épisode d'une notification, par-dessus l'écran courant (« retour » y ramène). @param {NonNullable<ReturnType<typeof P.notifTarget>>} t */
+  openNotified(t) {
+    if (this.state.auth || !this.state.me) { this.pendingOpen = t; return; }
+    // Timeline pas encore placée : au retour, elle se cale sur « À regarder » (aucune position mémorisée).
+    const unplaced = this.pendingScroll === 'anchor';
+    this.setState(NO_OVERLAY);
+    this.push(this.epView(t.show, t.name || undefined, { id: t.ep, season: t.season, number: t.number }));
+    if (unplaced) { this.savedRel = null; this.savedTop = null; }
+  }
+
+  /** État de l'appareil ; la première fois, propose les notifications (ou l'installation sur iPhone). */
+  initPush() {
+    const me = this.state.me;
+    if (!me) return;
+    const epoch = this.epoch;
+    P.syncPush(me.username).then((push) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ push });
+      if (!P.shouldAsk() || this.state.auth || hasOverlay(this.state) || this.state.stack.length) return;
+      if (push === 'off' && P.permissionUndecided()) {
+        P.markAsked();
+        this.setState({ confirm: {
+          title: 'Notifications',
+          text: 'Être prévenu quand un nouvel épisode d’une de tes séries sort ?',
+          ok: 'Oui', cancel: 'Non',
+          action: () => { this.setPush(true); this.setState({ confirm: null }); },
+        } });
+      } else if (push === 'install') {
+        P.markAsked();
+        this.setState({ confirm: {
+          title: 'Notifications',
+          text: 'Pour être prévenu à chaque nouvel épisode, ajoute l’appli à l’écran d’accueil : bouton Partager, puis « Sur l’écran d’accueil ».',
+          ok: 'OK', cancel: null,
+          action: () => this.setState({ confirm: null }),
+        } });
+      }
+    }, () => { if (epoch === this.epoch && this.state.push === null) this.setState({ push: 'off' }); });
+  }
+
+  /** Interrupteur affiché tout de suite dans sa nouvelle position ; recalé sur le résultat. @param {boolean} on */
+  setPush(on) {
+    const me = this.state.me;
+    if (!me || this.state.pushBusy) return;
+    // Appelé directement depuis le geste : la demande de permission du navigateur doit en partir.
+    const req = on ? P.enablePush(me.username) : P.disablePush();
+    const before = this.state.push;
+    const epoch = this.epoch;
+    this.setState({ push: on ? 'on' : 'off', pushBusy: true });
+    req.then((push) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ push, pushBusy: false });
+      if (on && push === 'off') this.toast('Notifications non autorisées');
+    }, (e) => {
+      if (epoch !== this.epoch) return;
+      this.setState({ push: before, pushBusy: false });
+      this.failToast(e, on ? 'Activation impossible' : 'Désactivation impossible');
+    });
+  }
+
+  testPush() {
+    const epoch = this.epoch;
+    P.testPush().then((r) => {
+      if (epoch !== this.epoch) return;
+      if (r === 'sent') this.toast('Notification envoyée');
+      else if (r === 'gone') {
+        this.setState({ push: 'off' });
+        this.toast('Cet appareil n’est plus abonné : réactive les notifications');
+      } else this.toast('Le service de notifications a refusé l’envoi');
+    }, (e) => { if (epoch === this.epoch) this.failToast(e, 'Envoi impossible'); });
   }
 
   /** Échec d'une action : toast, sauf session terminée (la connexion s'affiche déjà). @param {any} e @param {string} text */
@@ -888,7 +985,10 @@ export class App extends Component {
     const d = this.state.delSelf;
     if (!d || d.busy || !d.pw) return;
     this.setDelSelf({ busy: true, error: null, bad: null });
-    api.deleteMe(d.pw).then(() => this.signedOut('Compte supprimé'), (e) => {
+    api.deleteMe(d.pw).then(() => {
+      P.forgetPush().catch(() => {});
+      this.signedOut('Compte supprimé');
+    }, (e) => {
       if (e && e.status === 401) return;
       this.setDelSelf({ busy: false, error: authErrorText(e), bad: authErrorField(e) });
     });

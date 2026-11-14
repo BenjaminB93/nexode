@@ -11,7 +11,7 @@ export type Base = { db: Db; now: Date };
 export type Ctx = Base & { catalog: Catalog; user: User };
 
 export const nowIso = (ctx: Base) => ctx.now.toISOString();
-export const today = (ctx: Ctx) => todayIn(ctx.user.timezone, ctx.now);
+export const today = (ctx: Pick<Ctx, 'now' | 'user'>) => todayIn(ctx.user.timezone, ctx.now);
 
 // Erreurs métier ; la couche HTTP les traduit en codes de statut. details est ajouté au corps de la réponse.
 export class AppError extends Error {

@@ -81,9 +81,19 @@ const seg = (x) => encodeURIComponent(String(x));
 
 export const api = {
   me: () => call('GET', '/me'),
-  /** @param {{ country?: string, shelveAfterDays?: number, notifOn?: boolean, notifHour?: number }} patch */
+  /** @param {{ country?: string, shelveAfterDays?: number, notifHour?: number }} patch */
   patchMe: (patch) => call('PATCH', '/me', patch),
   countries: () => call('GET', '/countries'),
+
+  // Notifications de cet appareil (voir push.js). Clés VAPID absentes côté serveur : ApiError 'push_unavailable'.
+  pushKey: () => call('GET', '/push/key'),
+  /** @param {PushSubscriptionJSON} sub */
+  pushSubscribe: (sub) => call('PUT', '/push/subscription', sub),
+  /** @param {string} endpoint */
+  pushUnsubscribe: (endpoint) => call('DELETE', '/push/subscription', { endpoint }),
+  /** @param {string} endpoint @returns {Promise<{ result: 'sent' | 'gone' | 'failed' }>} */
+  pushTest: (endpoint) => call('POST', '/push/test', { endpoint }),
+
   timeline: () => call('GET', '/timeline'),
   /** @param {string | null} before curseur opaque renvoyé par la page précédente */
   history: (before) => call('GET', '/history' + (before ? '?before=' + seg(before) : '')),

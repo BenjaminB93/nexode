@@ -144,8 +144,8 @@ export function pickerSheet(p, onClose) {
 }
 
 /**
- * Confirmation (coche de saison, suppression de compte). danger = bouton rouge.
- * @param {{ title: string, text: string, ok: string, action: () => void, danger?: boolean }} c @param {() => void} onCancel
+ * Confirmation (coche de saison, suppression de compte, notifications). danger = bouton rouge ; cancel : libellé du second bouton (null = absent).
+ * @param {{ title: string, text: string, ok: string, action: () => void, danger?: boolean, cancel?: string | null }} c @param {() => void} onCancel
  */
 export function confirmSheet(c, onCancel) {
   return html`<div class="overlay backdrop-in">
@@ -153,7 +153,7 @@ export function confirmSheet(c, onCancel) {
       <h2 class="sheet-title">${c.title}</h2>
       <p style="margin: 0 0 8px; font-size: 14px; line-height: 1.5; color: var(--soft)">${c.text}</p>
       <button type="button" class="btn btn-primary press" style=${c.danger ? DANGER_BTN : null} onClick=${() => c.action()}>${c.ok}</button>
-      <button type="button" class="btn btn-ghost" style="height: 48px; font-size: 14px; font-weight: 600" onClick=${onCancel}>Annuler</button>
+      ${c.cancel === null ? null : html`<button type="button" class="btn btn-ghost" style="height: 48px; font-size: 14px; font-weight: 600" onClick=${onCancel}>${c.cancel || 'Annuler'}</button>`}
     </div>
   </div>`;
 }

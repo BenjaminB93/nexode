@@ -11,14 +11,14 @@ export type ShelveAfterDays = (typeof SHELVE_AFTER_DAYS)[number];
 
 // « me » de l'API : compte courant et ses réglages.
 export type Settings = {
-  username: string; role: Role; country: string; shelveAfterDays: number; notifOn: boolean; notifHour: number; timezone: string;
+  username: string; role: Role; country: string; shelveAfterDays: number; notifHour: number; timezone: string;
 };
-export type SettingsPatch = { country?: string; shelveAfterDays?: ShelveAfterDays; notifOn?: boolean; notifHour?: number };
+export type SettingsPatch = { country?: string; shelveAfterDays?: ShelveAfterDays; notifHour?: number };
 
 export function getMe(db: Db, userId: number): Settings {
   const row = getUserSettings(db, userId);
   if (!row) throw new NotFoundError('compte');
-  return { ...row, notifOn: row.notifOn === 1 };
+  return { ...row };
 }
 
 export const getSettings = (ctx: Ctx): Settings => getMe(ctx.db, ctx.user.id);
@@ -39,7 +39,6 @@ export async function updateSettings(ctx: Ctx, patch: SettingsPatch): Promise<Se
   updateUserSettings(ctx.db, ctx.user.id, {
     country: patch.country ?? null,
     shelveAfterDays: patch.shelveAfterDays ?? null,
-    notifOn: patch.notifOn === undefined ? null : Number(patch.notifOn),
     notifHour: patch.notifHour ?? null,
   });
   return getSettings(ctx);

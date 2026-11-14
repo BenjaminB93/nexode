@@ -65,7 +65,7 @@ test('connexion : 200 { me }, cookie HttpOnly/Lax/Path=/ 180 j, jeton stocké ha
   s.user('camille', 'admin');
   const r = await s.req('POST', '/api/auth/login', { body: { username: 'camille', password: PW } });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { me: { username: 'camille', role: 'admin', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' } });
+  assert.deepEqual(r.body, { me: { username: 'camille', role: 'admin', country: 'FR', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' } });
   assert.equal(r.cookies.length, 1);
   const c = r.cookies[0] as string;
   assert.match(c, /^sid=[A-Za-z0-9_-]{43};/);
@@ -272,7 +272,7 @@ test('invitation : création (code jamais stocké en clair), consultation, inscr
 
   const r = await s.req('POST', '/api/auth/signup', { body: { code: inv.code, username: 'Léa', password: 'dix caract' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
-  assert.deepEqual(r.body, { me: { username: 'Léa', role: 'membre', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' } });
+  assert.deepEqual(r.body, { me: { username: 'Léa', role: 'membre', country: 'FR', shelveAfterDays: 30, notifHour: 9, timezone: 'Europe/Paris' } });
   assert.match(r.cookies[0] as string, /^sid=[\w-]{43}; Max-Age=15552000; Path=\/; HttpOnly; SameSite=Lax$/);
   assert.equal((await s.req('GET', '/api/me', { cookie: cookieOf(r.cookies) })).body.username, 'Léa');
   const lea = s.db.prepare(`SELECT id, invited_by b, role FROM users WHERE username = 'Léa'`).get() as { id: number; b: number; role: string };
@@ -571,7 +571,7 @@ test('export : fichier JSON en pièce jointe, ids TMDB, épisodes triés par dat
   seedShow(s.db, { id: 1003, name: 'Non suivie', seasons: [['2026-01-01']] });
   await s.req('PUT', '/api/shows/1001/relation', { cookie: u.cookie, body: { to: 'on' } });
   await s.req('PUT', '/api/shows/1002/relation', { cookie: u.cookie, body: { to: 'shelf' } });
-  await s.req('PATCH', '/api/me', { cookie: u.cookie, body: { country: 'BE', notifOn: false, notifHour: 20 } });
+  await s.req('PATCH', '/api/me', { cookie: u.cookie, body: { country: 'BE', notifHour: 20 } });
   await s.req('PUT', `/api/watched/${epId(1001, 1, 2)}`, { cookie: u.cookie, body: { watchedAt: '2026-11-10T20:00:00Z' } });
   await s.req('PUT', `/api/watched/${epId(1003, 1, 1)}`, { cookie: u.cookie, body: { watchedAt: '2026-11-12T20:00:00Z' } });
   await s.req('PUT', `/api/watched/${epId(1001, 1, 1)}`, { cookie: u.cookie, body: { watchedAt: '2026-11-01T20:00:00Z' } });
@@ -584,7 +584,7 @@ test('export : fichier JSON en pièce jointe, ids TMDB, épisodes triés par dat
     format: 'suivi-series/1',
     exporte_le: NOW,
     compte: 'julie',
-    reglages: { pays: 'BE', mise_de_cote_jours: 30, notifications: { actives: false, heure: 20 } },
+    reglages: { pays: 'BE', mise_de_cote_jours: 30, notifications: { heure: 20 } },
     series: [{ tmdb_id: 1002, serie: 'Andor', etat: 'de_cote' }, { tmdb_id: 1001, serie: 'Severance', etat: 'suivie' }],
     episodes_vus: [
       { tmdb_id_serie: 1001, tmdb_id_episode: epId(1001, 1, 1), serie: 'Severance', saison: 1, episode: 1, titre: 'Épisode 1x1', vu_le: '2026-11-01T20:00:00.000Z' },

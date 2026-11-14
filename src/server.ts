@@ -6,6 +6,8 @@ import { createApp } from './http/app.ts';
 import { createCatalog } from './infra/catalog.ts';
 import { createScheduler } from './infra/scheduler.ts';
 import { createTmdb } from './infra/tmdb.ts';
+import { createPush } from './infra/webpush.ts';
+import { describeNotify, sendDueNotifications } from './usecases/notify.ts';
 import { dailyMaintenance, describePurge, describeRefresh } from './usecases/refresh.ts';
 
 const config = loadConfig();
@@ -21,7 +23,10 @@ if (!catalog) console.warn('TMDB_READ_TOKEN absent : catalogue en lecture seule,
 if (config.env === 'production' && !config.siteUrl.startsWith('https://')) console.warn(`SITE_URL n'est pas en HTTPS : ${config.siteUrl}`);
 if (config.env !== 'production' && config.siteUrl.startsWith('https://')) console.warn(`SITE_URL est en HTTPS mais NODE_ENV n'est pas production (${config.env}) : mettre NODE_ENV=production.`);
 
-const app = createApp({ db, catalog, siteUrl: config.siteUrl, production: config.env === 'production', trustProxy: config.trustProxy });
+const push = config.vapid && createPush(config.vapid);
+if (!push) console.warn('VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY absentes : notifications désactivées');
+
+const app = createApp({ db, catalog, push, siteUrl: config.siteUrl, production: config.env === 'production', trustProxy: config.trustProxy });
 
 const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
   console.log(`écoute sur http://${info.address}:${info.port} (${config.env})`);
@@ -34,6 +39,12 @@ scheduler.daily('maintenance', '04:30', async (signal) => {
   const refresh = r.refresh ? `, ${describeRefresh(r.refresh)}, ${(tmdb?.calls() ?? 0) - calls} appels TMDB` : '';
   console.log(`maintenance : ${describePurge(r.purgedResets)}${refresh}`);
 });
+if (push) {
+  scheduler.hourly('notifications', 0, async (signal) => {
+    const r = await sendDueNotifications({ db, push, signal });
+    if (r.sent || r.gone || r.failed) console.log(`notifications : ${describeNotify(r)}`);
+  });
+}
 
 // Arrêt : plus de nouvelle tâche ni connexion ; la tâche en cours s'arrête entre deux séries, les requêtes en cours finissent.
 // Au plus tard après SHUTDOWN_MS (Docker tue à 10 s), sortie forcée. Un second signal sort tout de suite.

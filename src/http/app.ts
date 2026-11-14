@@ -7,7 +7,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Db } from '../db/index.ts';
-import type { Catalog } from '../ports.ts';
+import type { Catalog, Push } from '../ports.ts';
 import { HashBusyError } from '../infra/secrets.ts';
 import { AppError, UpstreamError } from '../usecases/context.ts';
 import { createApi } from './api.ts';
@@ -21,7 +21,7 @@ export const PUBLIC_DIR = join(import.meta.dirname, '..', '..', 'public');
 // siteUrl : origine publique (liens envoyés, contrôle d'Origin) ; en https, cookie Secure. production : cookie Secure, Origin comparé à siteUrl seul.
 // trustProxy : l'adresse du client est lue dans X-Forwarded-For (derrière Caddy).
 export type AppDeps = {
-  db: Db; catalog?: Catalog; now?: () => Date; siteUrl?: string; production?: boolean; trustProxy?: boolean; limits?: Limits;
+  db: Db; catalog?: Catalog; push?: Push; now?: () => Date; siteUrl?: string; production?: boolean; trustProxy?: boolean; limits?: Limits;
 };
 
 const STATUS: Record<string, ContentfulStatusCode> = {
@@ -42,6 +42,7 @@ const STATUS: Record<string, ContentfulStatusCode> = {
   last_admin: 409,
   too_many_attempts: 429,
   import_busy: 409,
+  push_unavailable: 503,
   catalog_unavailable: 502,
 };
 
@@ -102,6 +103,7 @@ export function createApp(deps: AppDeps): Hono {
   api.route('/', createApi({
     db: deps.db,
     catalog: deps.catalog ?? unavailableCatalog,
+    push: deps.push,
     now,
     siteUrl,
     secureCookie,

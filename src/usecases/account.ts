@@ -31,7 +31,7 @@ export type ExportData = {
   format: 'suivi-series/1';
   exporte_le: string;
   compte: string;
-  reglages: { pays: string; mise_de_cote_jours: number; notifications: { actives: boolean; heure: number } };
+  reglages: { pays: string; mise_de_cote_jours: number; notifications: { heure: number } };
   series: { tmdb_id: number; serie: string; etat: 'suivie' | 'de_cote' }[];
   episodes_vus: {
     tmdb_id_serie: number; tmdb_id_episode: number; serie: string; saison: number; episode: number; titre: string | null; vu_le: string;
@@ -46,7 +46,7 @@ export function exportData(ctx: Ctx): { filename: string; data: ExportData } {
     format: 'suivi-series/1',
     exporte_le: nowIso(ctx),
     compte: s.username,
-    reglages: { pays: s.country, mise_de_cote_jours: s.shelveAfterDays, notifications: { actives: s.notifOn === 1, heure: s.notifHour } },
+    reglages: { pays: s.country, mise_de_cote_jours: s.shelveAfterDays, notifications: { heure: s.notifHour } },
     series: getExportShows(ctx.db, ctx.user.id).map((r) => ({
       tmdb_id: r.showId, serie: r.name, etat: r.state === 'followed' ? 'suivie' : 'de_cote',
     })),

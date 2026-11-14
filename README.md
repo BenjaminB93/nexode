@@ -61,7 +61,19 @@ ssh <utilisateur>@<IP du Pi> "cd series && docker compose up -d --build"
 
 Le push est refusé si un fichier suivi a été modifié directement sur le Pi (rien n'est écrasé).
 
-Les migrations de la base s'appliquent au démarrage. Si `Caddyfile` a changé : `docker compose restart caddy` (le fichier est monté seul, le conteneur garde sinon l'ancienne version). Les anciennes images s'accumulent : `docker image prune -f` de temps en temps.
+Les migrations de la base s'appliquent au démarrage.
+
+## Notifications
+
+Web Push : le serveur s'identifie auprès des services push (Google, Apple, Mozilla, Microsoft) par une paire de clés **VAPID**. À générer une seule fois (en changer désabonne tous les appareils) :
+
+```sh
+node src/cli/vapid-keys.ts        # sur le PC ; copier les deux lignes dans le .env du Pi, puis docker compose up -d
+```
+
+Sans ces clés, l'appli tourne sans notifications (Profil l'indique). Elles exigent le HTTPS : en local, seul `localhost` fonctionne (navigateur du PC). Sur iPhone (iOS 16.4 et plus), l'appli doit être ajoutée à l'écran d'accueil (Partager › Sur l'écran d'accueil), sinon Safari ne propose pas les notifications.
+
+Envoi : chaque heure pile, chaque compte dont l'heure choisie est passée reçoit une notification par série suivie (hors De côté) ayant un épisode non vu qui sort ce jour-là, une seule fois par série et par jour. Les journaux (`docker compose logs app`) résument chaque envoi. Si `Caddyfile` a changé : `docker compose restart caddy` (le fichier est monté seul, le conteneur garde sinon l'ancienne version). Les anciennes images s'accumulent : `docker image prune -f` de temps en temps.
 
 ## Sauvegarder
 

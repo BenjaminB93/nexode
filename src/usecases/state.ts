@@ -19,7 +19,8 @@ export type LoadedShow = {
 };
 
 // Charge plusieurs séries en 4 requêtes (séries, épisodes, vus, suivi). Les ids absents du cache sont ignorés.
-export function loadShows(ctx: Ctx, showIds: readonly number[]): Map<number, LoadedShow> {
+// Sans catalogue : utilisable hors requête HTTP (tâche de notifications).
+export function loadShows(ctx: Pick<Ctx, 'db' | 'now' | 'user'>, showIds: readonly number[]): Map<number, LoadedShow> {
   const { db, user } = ctx;
   const out = new Map<number, LoadedShow>();
   if (!showIds.length) return out;
