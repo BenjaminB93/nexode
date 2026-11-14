@@ -9,7 +9,7 @@
     "dev": "node --env-file-if-exists=.env --watch src/server.ts",
     "start": "node src/server.ts",
     "test": "node --test \"test/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.front.json"
   },
   "dependencies": {
     "@hono/node-server": "2.1.8",

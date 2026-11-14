@@ -1,0 +1,102 @@
+/* Appli mobile plein écran. Toutes les couleurs passent par ces variables : aucune couleur en dur dans les vues. */
+:root {
+  color-scheme: dark;
+  --on-accent: #1A1406; --ok-line: #2E5E4C; --on-ok: #0E1014;
+  --line2: #2C3240; --line-strong: #3A4150; --chip: #232833; --chip2: #1B1F27; --tick-off: #4A5160;
+  --hist: #8A929E; --hist-strong: #A3AAB5; --hist-check: #5C8F7C; --hist-bg: #13161C;
+  --toast: #2A2F3A; --sheet: #1A1E26; --backdrop: rgba(5, 6, 8, 0.66); --shadow: rgba(0, 0, 0, 0.45); --knob: #FFFFFF;
+  --bg: #0E1014; --bar: #12151A; --card: #171A21; --cardline: #232833; --line: #1F232C;
+  --fg: #ECEEF1; --soft: #C9CED6; --muted: #9BA3AF; --faint: #7D8590; --dim: #6B7380;
+  --accent: #F2B544; --accent-bg: #2A2414; --ok: #3CCB9B; --ok-strong: #1F7A5A; --ok-bg: #123328; --ok-fg: #9FD9C2;
+  --danger: #F08A7E; --on-danger: #FFFFFF; --on-armed: #FFFFFF;
+  --display: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --text: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Thème clair : posé par /app/theme-boot.js avant le premier rendu, puis par l'appli (réglage Profil). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F5F6F8; --bar: #FFFFFF; --card: #FFFFFF; --cardline: #E2E5EA; --line: #E4E7EB;
+  --fg: #15181D; --soft: #39404B; --muted: #5B6370; --faint: #6E7682; --dim: #808894;
+  --accent: #B5760A; --accent-bg: #FAEFD8; --on-accent: #FFFFFF;
+  --ok: #1E9E74; --ok-strong: #1E9E74; --ok-bg: #DCF2E9; --ok-fg: #166A4F; --ok-line: #A6D9C4; --on-ok: #FFFFFF;
+  --danger: #C4453A;
+  --line2: #D3D8DF; --line-strong: #C0C6CF; --chip: #ECEEF2; --chip2: #F0F1F4; --tick-off: #B3B9C2;
+  --hist: #6A727E; --hist-strong: #4D5562; --hist-check: #3F9C7A; --hist-bg: #FFFFFF;
+  --toast: #FFFFFF; --sheet: #FFFFFF; --backdrop: rgba(20, 23, 28, 0.35); --shadow: rgba(20, 23, 28, 0.18); --knob: #FFFFFF;
+}
+html, body { height: 100%; }
+body { margin: 0; box-sizing: border-box; padding-top: var(--safe-top); background: var(--bg); color: var(--fg); font-family: var(--text); overflow: hidden; -webkit-tap-highlight-color: transparent; }
+#app { position: relative; height: 100%; max-width: 440px; margin: 0 auto; overflow: hidden; background: var(--bg); }
+@media (min-width: 600px) { #app { border-left: 1px solid var(--line); border-right: 1px solid var(--line); } }
+button { font-family: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scroll::-webkit-scrollbar { width: 0; height: 0; }
+.ell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sw { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sw img { pointer-events: none; -webkit-user-drag: none; }
+.screen { position: absolute; inset: 0; background: var(--bg); }
+.main { position: absolute; left: 0; right: 0; top: 0; bottom: calc(72px + var(--safe-bottom)); }
+.hdr { position: absolute; left: 0; right: 0; top: 0; height: 64px; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: var(--bg); z-index: 2; }
+.hdr.nav { padding: 0 8px; justify-content: flex-start; gap: 2px; }
+.h1 { margin: 0; font-family: var(--display); font-size: 22px; font-weight: 700; text-wrap: balance; }
+.body { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; overflow-y: auto; padding: 16px 16px 28px; display: flex; flex-direction: column; gap: 16px; }
+/* Le contenu défile : ses blocs gardent leur hauteur (sinon un bloc en overflow: hidden se fait écraser quand l'écran est court). */
+.body > * { flex-shrink: 0; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); }
+.daylabel { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.reveal { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 13px; font-weight: 700; }
+.swbtn { position: absolute; inset: 0; width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 12px; text-align: left; color: inherit; font: inherit; cursor: pointer; touch-action: pan-y; }
+.card { border-radius: 16px; background: var(--card); border: 1px solid var(--cardline); }
+.show-name { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.badge { flex: none; min-width: 32px; height: 26px; padding: 0 8px; box-sizing: border-box; border-radius: 13px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.vo { padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line-strong); font-size: 10px; font-weight: 600; }
+.iconbtn { flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: transparent; color: var(--fg); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.crumb { flex: 0 1 auto; min-width: 0; height: 44px; border: 0; background: transparent; color: var(--accent); font: 600 15px var(--text); cursor: pointer; padding: 0 4px; }
+.dot { width: 26px; height: 26px; border-radius: 13px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+.group { display: flex; flex-direction: column; border-radius: 16px; background: var(--card); border: 1px solid var(--cardline); overflow: hidden; }
+.row { min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px 0 16px; font-size: 15px; }
+.row + .row { border-top: 1px solid var(--cardline); }
+.pickrow { width: 100%; border: 0; background: transparent; color: var(--fg); font: 400 15px var(--text); text-align: left; cursor: pointer; padding-right: 12px; }
+.pickval { display: flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 600; font-size: 14px; }
+.opt { min-height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border: 0; border-radius: 12px; background: transparent; color: var(--fg); font: 500 15px var(--text); cursor: pointer; }
+.opt[aria-checked="true"] { background: var(--chip); color: var(--accent); font-weight: 700; }
+.hourgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.hour { height: 44px; border: 1px solid var(--cardline); border-radius: 10px; background: transparent; color: var(--soft); font: 600 13px var(--text); cursor: pointer; }
+.hour[aria-checked="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.btn { height: 50px; border-radius: 14px; font: 700 15px var(--text); cursor: pointer; }
+.btn-primary { border: 0; background: var(--accent); color: var(--on-accent); }
+.btn-ghost { border: 1px solid var(--line-strong); background: transparent; color: var(--fg); }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; height: calc(72px + var(--safe-bottom)); box-sizing: border-box; padding-bottom: var(--safe-bottom); border-top: 1px solid var(--line); background: var(--bar); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tab { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 11px var(--text); cursor: pointer; }
+.prov { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--soft); }
+.prov img, .prov .ph { flex: none; width: 28px; height: 28px; border-radius: 7px; object-fit: cover; background: var(--chip); }
+/* Image absente ou pas encore chargée : fond neutre de la même taille, rien ne bouge. */
+.poster { flex: none; display: block; object-fit: cover; background: var(--chip); }
+/* Blocs réservés pendant un chargement : même taille que le contenu attendu. */
+.ph-line { display: block; height: 12px; border-radius: 6px; background: var(--chip); }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+.toast { position: absolute; left: 12px; right: 12px; bottom: calc(84px + var(--safe-bottom)); height: 52px; box-sizing: border-box; border-radius: 14px; background: var(--toast); color: var(--fg); border: 1px solid var(--cardline); box-shadow: 0 8px 24px var(--shadow); display: flex; align-items: center; gap: 10px; padding: 0 6px 0 16px; z-index: 5; }
+.overlay { position: absolute; inset: 0; z-index: 10; background: var(--backdrop); display: flex; align-items: flex-end; }
+.sheetbox { width: 100%; box-sizing: border-box; border-radius: 22px 22px 0 0; background: var(--sheet); border-top: 1px solid var(--line2); display: flex; flex-direction: column; }
+.sheet-title { margin: 0; font-family: var(--display); font-size: 19px; font-weight: 700; }
+/* Animations : courtes (≤ 0,3 s), jamais bloquantes, aucune ne déplace la mise en page. */
+.dot { transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.32s cubic-bezier(0.34, 1.8, 0.64, 1); }
+.dot svg { transition: color 0.2s ease; }
+.seg-thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; border-radius: 8px; transition: transform 0.28s cubic-bezier(0.3, 1.25, 0.5, 1), background-color 0.28s ease; }
+.press, .btn, .iconbtn, .crumb, .tab { transition: transform 0.12s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+.press:active, .btn:active, .iconbtn:active, .crumb:active, .tab:active { transform: scale(0.95); }
+@keyframes in-fwd { from { opacity: 0; transform: translateX(32px); } }
+@keyframes in-back { from { opacity: 0; transform: translateX(-32px); } }
+@keyframes in-fade { from { opacity: 0; } }
+@keyframes in-up { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+.view { position: absolute; inset: 0; }
+/* Entre deux vues de l'explorateur, l'en-tête (retour + fil d'Ariane) reste fixe : seul le contenu glisse. */
+.v-fwd:not(.v-keephdr), .v-keephdr.v-fwd .body { animation: in-fwd 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.v-back:not(.v-keephdr), .v-keephdr.v-back .body { animation: in-back 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.toast-in { animation: in-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.backdrop-in { animation: in-fade 0.18s ease; }
+.sheet-in { animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }

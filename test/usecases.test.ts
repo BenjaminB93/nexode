@@ -5,6 +5,7 @@ import { NotAiredError, NotFoundError, UpstreamError } from '../src/usecases/con
 import { history, myShows, shelf, timeline } from '../src/usecases/lists.ts';
 import { setRelation } from '../src/usecases/relation.ts';
 import { search } from '../src/usecases/search.ts';
+import { getSettings, updateSettings } from '../src/usecases/settings.ts';
 import { seasonDetail, showDetail } from '../src/usecases/show.ts';
 import { markSeason, markWatched, unmarkWatched, watchedUntil } from '../src/usecases/watched.ts';
 import { type ShowFixture, FakeCatalog, epId, makeCtx, testDb } from './helpers/fake-catalog.ts';
@@ -333,4 +334,40 @@ test('épisode vu puis retiré chez TMDB (removed_at) : hors statut et saisons, 
   const t = timeline(ctx).toWatch.find((x) => x.show.id === SEV.id);
   assert.equal(t?.next.id, epId(1001, 2, 1));
   assert.equal(t?.remaining, 1);
+});
+
+test('À regarder : upNext = épisodes sortis non vus après next, même forme que next', async () => {
+  const { ctx } = setup();
+  await setRelation(ctx, SEV.id, 'on');
+  markWatched(ctx, [{ episodeId: epId(1001, 1, 2) }]);
+  const t = timeline(ctx).toWatch.find((x) => x.show.id === SEV.id);
+  assert.equal(t?.next.id, epId(1001, 1, 1));
+  // S1E2 vu, S2E2 futur, S2E3 sans date : exclus.
+  assert.deepEqual(t?.upNext, [
+    { id: epId(1001, 1, 3), season: 1, number: 3, title: 'Épisode 1x3', titleIsVo: false, airDate: '2026-10-15' },
+    { id: epId(1001, 2, 1), season: 2, number: 1, title: 'Épisode 2x1', titleIsVo: true, airDate: '2026-11-13' },
+  ]);
+  assert.deepEqual(Object.keys(t?.upNext[0] ?? {}).sort(), Object.keys(t?.next ?? {}).sort());
+
+  markWatched(ctx, [{ episodeId: epId(1001, 1, 1) }, { episodeId: epId(1001, 1, 3) }]);
+  const last = timeline(ctx).toWatch.find((x) => x.show.id === SEV.id);
+  assert.equal(last?.next.id, epId(1001, 2, 1));
+  assert.deepEqual(last?.upNext, []);
+});
+
+test('réglages : valeurs par défaut, écriture partielle, seuil appliqué aux listes', async () => {
+  const { db, catalog, ctx } = setup();
+  assert.deepEqual(getSettings(ctx),
+    { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
+  assert.deepEqual(updateSettings(ctx, { notifOn: false, notifHour: 0 }),
+    { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+  assert.deepEqual(updateSettings(ctx, { country: 'BE', shelveAfterDays: 90 }),
+    { username: 'dev', country: 'BE', shelveAfterDays: 90, notifOn: false, notifHour: 0, timezone: 'Europe/Paris' });
+  assert.equal(updateSettings(ctx, {}).country, 'BE');
+
+  // LONGUE ajoutée il y a ~45 jours sans épisode vu : de côté à 30 j, en cours à 90 j.
+  await setRelation(at(db, catalog, '2026-09-29T10:00:00.000Z'), LONGUE.id, 'on');
+  assert.deepEqual(timeline(at(db, catalog, NOW)).toWatch.map((x) => x.show.id), [LONGUE.id]);
+  updateSettings(ctx, { shelveAfterDays: 30 });
+  assert.deepEqual(timeline(at(db, catalog, NOW)).toWatch, []);
 });

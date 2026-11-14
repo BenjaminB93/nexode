@@ -191,3 +191,72 @@ test('corps trop gros → 413', async () => {
   assert.equal(r.status, 413);
   assert.deepEqual(r.body, { error: 'payload_too_large' });
 });
+
+test('GET /api/me : forme et valeurs par défaut', async () => {
+  const { call } = setup();
+  const r = await call('GET', '/api/me');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { username: 'dev', country: 'FR', shelveAfterDays: 30, notifOn: true, notifHour: 9, timezone: 'Europe/Paris' });
+});
+
+test('PATCH /api/me : champs facultatifs, persistance, réponse = GET /api/me', async () => {
+  const { call } = setup();
+  const a = await call('PATCH', '/api/me', { country: 'CH', notifOn: false });
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.body, { username: 'dev', country: 'CH', shelveAfterDays: 30, notifOn: false, notifHour: 9, timezone: 'Europe/Paris' });
+  const b = await call('PATCH', '/api/me', { shelveAfterDays: 15, notifHour: 23 });
+  assert.deepEqual(b.body, { username: 'dev', country: 'CH', shelveAfterDays: 15, notifOn: false, notifHour: 23, timezone: 'Europe/Paris' });
+  assert.deepEqual((await call('PATCH', '/api/me', {})).body, b.body);
+  assert.deepEqual((await call('GET', '/api/me')).body, b.body);
+  for (const country of ['FR', 'BE', 'CH', 'CA']) assert.equal((await call('PATCH', '/api/me', { country })).body.country, country);
+  for (const d of [15, 30, 60, 90]) assert.equal((await call('PATCH', '/api/me', { shelveAfterDays: d })).body.shelveAfterDays, d);
+  assert.equal((await call('PATCH', '/api/me', { notifHour: 0 })).body.notifHour, 0);
+  assert.equal((await call('PATCH', '/api/me', { notifOn: true })).body.notifOn, true);
+});
+
+test('PATCH /api/me : validation → 400 sans écriture partielle', async () => {
+  const { call } = setup();
+  const before = (await call('GET', '/api/me')).body;
+  const bad = async (body: unknown, field: string) => {
+    const r = await call('PATCH', '/api/me', body);
+    assert.equal(r.status, 400, JSON.stringify(body));
+    assert.deepEqual(r.body, { error: 'invalid_input', field }, JSON.stringify(body));
+  };
+  await bad({ country: 'US' }, 'country');
+  await bad({ country: 'fr' }, 'country');
+  await bad({ country: null }, 'country');
+  await bad({ shelveAfterDays: 45 }, 'shelveAfterDays');
+  await bad({ shelveAfterDays: '30' }, 'shelveAfterDays');
+  await bad({ shelveAfterDays: 0 }, 'shelveAfterDays');
+  await bad({ notifOn: 'true' }, 'notifOn');
+  await bad({ notifOn: 1 }, 'notifOn');
+  await bad({ notifHour: 24 }, 'notifHour');
+  await bad({ notifHour: -1 }, 'notifHour');
+  await bad({ notifHour: 9.5 }, 'notifHour');
+  await bad({ notifHour: '9' }, 'notifHour');
+  await bad({ timezone: 'UTC' }, 'timezone');
+  await bad({ username: 'autre' }, 'username');
+  await bad({ country: 'BE', notifHour: 30 }, 'notifHour');   // champ valide + invalide : rien n'est écrit
+  assert.deepEqual((await call('PATCH', '/api/me', '{"country":"BE"}', { 'content-type': 'text/plain' })).body, { error: 'json_required' });
+  assert.equal((await call('PATCH', '/api/me', '[]')).status, 400);
+  assert.deepEqual((await call('GET', '/api/me')).body, before);
+});
+
+test('GET /api/timeline : upNext (3 au plus, ordre saison/numéro, sortis et non vus)', async () => {
+  const { db, call } = setup();
+  const BIG = 1010;
+  seedShow(db, { id: BIG, name: 'Grosse', seasons: [['2026-01-01', '2026-01-08', '2026-01-15', '2026-01-22'], ['2026-02-01', '2026-02-08', '2026-12-01', null]] });
+  await call('PUT', `/api/shows/${BIG}/relation`, { to: 'on' });
+  await call('PUT', `/api/watched/${epId(BIG, 1, 2)}`, {});
+  const t = (await call('GET', '/api/timeline')).body.toWatch.find((x: any) => x.show.id === BIG);
+  assert.equal(t.next.id, epId(BIG, 1, 1));
+  // 4 sortis non vus après next : seuls les 3 premiers ; S1E2 vu, S2E3 futur, S2E4 sans date.
+  assert.deepEqual(t.upNext.map((e: any) => e.id), [epId(BIG, 1, 3), epId(BIG, 1, 4), epId(BIG, 2, 1)]);
+  assert.deepEqual(Object.keys(t.upNext[0]).sort(), Object.keys(t.next).sort());
+  assert.equal(t.remaining, 5);
+
+  await call('POST', '/api/watched/batch', { on: true, episodeIds: [epId(BIG, 1, 1), epId(BIG, 1, 3), epId(BIG, 1, 4), epId(BIG, 2, 1)] });
+  const end = (await call('GET', '/api/timeline')).body.toWatch.find((x: any) => x.show.id === BIG);
+  assert.equal(end.next.id, epId(BIG, 2, 2));
+  assert.deepEqual(end.upNext, []);
+});

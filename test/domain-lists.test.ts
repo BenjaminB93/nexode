@@ -29,6 +29,24 @@ test('À regarder : séries en cours, prochain épisode le plus ancien en haut, 
   assert.deepEqual(list.map((x) => [x.show.name, x.next.number, x.remaining]), [['Beta', 1, 1], ['Zeta', 1, 1], ['Alpha', 2, 1]]);
 });
 
+test('À regarder : upNext = sortis non vus après next, par saison puis numéro, 3 au plus', () => {
+  // Reçus dans le désordre ; 102 vu, 104 sans date, 204 futur.
+  const ep = (season: number, number: number, airDate: string | null): EpisodeLike => ({ id: season * 100 + number, season, number, airDate });
+  const episodes = [
+    ep(2, 4, '2026-11-20'), ep(2, 3, '2026-11-12'), ep(1, 4, null), ep(2, 1, '2026-11-01'),
+    ep(1, 3, '2026-10-15'), ep(2, 2, '2026-11-05'), ep(1, 2, '2026-10-08'), ep(1, 1, '2026-10-01'),
+  ];
+  const follow = f('2026-11-01T00:00:00Z');
+  const info = computeStatus({ episodes, watched: new Map([[102, '2026-11-10T20:00:00Z']]), showStatus: 'returning', follow, today: TODAY, timezone: 'Europe/Paris', shelveAfterDays: 30 });
+  const [x] = buildToWatch([{ show: { id: 1, name: 'A' }, follow, info }]);
+  assert.equal(x?.next.id, 101);
+  assert.deepEqual(x?.upNext.map((e) => e.id), [103, 201, 202]);
+  assert.equal(x?.remaining, 5);
+
+  const last = buildToWatch([entry(2, 'B', ['2026-11-01', '2026-11-20'], {}, follow)]);
+  assert.deepEqual(last.map((y) => [y.next.number, y.upNext]), [[1, []]]);
+});
+
 test('À venir : 2 prochains épisodes par série suivie hors « de côté », par date', () => {
   const list = buildUpcoming([
     entry(1, 'A', ['2026-11-01', '2026-11-20', '2026-11-27', '2026-12-04'], {}, f('2026-11-01T00:00:00Z')),

@@ -7,9 +7,10 @@ import { type Ctx, AppError, InvalidInputError } from '../usecases/context.ts';
 import { HISTORY_PAGE, decodeCursor, history, myShows, shelf, timeline } from '../usecases/lists.ts';
 import { setRelation } from '../usecases/relation.ts';
 import { search } from '../usecases/search.ts';
+import { COUNTRIES, SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, updateSettings } from '../usecases/settings.ts';
 import { seasonDetail, showDetail } from '../usecases/show.ts';
 import { type MarkEntry, markSeason, markWatched, unmarkWatched, watchedUntil } from '../usecases/watched.ts';
-import { MAX_BATCH, bool, idList, instant, jsonBody, jsonId, oneOf, positiveId } from './validate.ts';
+import { MAX_BATCH, bool, idList, instant, intOneOf, intRange, jsonBody, jsonId, oneOf, positiveId } from './validate.ts';
 
 export type ApiDeps = { db: Db; catalog: Catalog; devUser: boolean; now: () => Date };
 
@@ -31,6 +32,20 @@ export function createApi(deps: ApiDeps): Hono {
       user: { id: u.id, country: u.country, timezone: u.timezone, shelveAfterDays: u.shelveAfterDays },
     };
   };
+
+  api.get('/me', (c) => c.json(getSettings(ctxOf())));
+
+  // Champs facultatifs ; tout est validé avant la moindre écriture.
+  api.patch('/me', async (c) => {
+    const ctx = ctxOf();
+    const body = await jsonBody(c, ['country', 'shelveAfterDays', 'notifOn', 'notifHour']);
+    const patch: SettingsPatch = {};
+    if (body.country !== undefined) patch.country = oneOf(body.country, COUNTRIES, 'country');
+    if (body.shelveAfterDays !== undefined) patch.shelveAfterDays = intOneOf(body.shelveAfterDays, SHELVE_AFTER_DAYS, 'shelveAfterDays');
+    if (body.notifOn !== undefined) patch.notifOn = bool(body.notifOn, 'notifOn');
+    if (body.notifHour !== undefined) patch.notifHour = intRange(body.notifHour, 0, 23, 'notifHour');
+    return c.json(updateSettings(ctx, patch));
+  });
 
   api.get('/timeline', (c) => c.json(timeline(ctxOf())));
 

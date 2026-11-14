@@ -22,6 +22,24 @@ export function ensureUser(db: Db, username: string, nowIso: string): UserRow {
   return one<UserRow>(db, `SELECT ${USER_COLS} FROM users WHERE username = ?`, username) as UserRow;
 }
 
+export type UserSettingsRow = {
+  username: string; country: string; shelveAfterDays: number; notifOn: number; notifHour: number; timezone: string;
+};
+
+export function getUserSettings(db: Db, id: number): UserSettingsRow | undefined {
+  return one<UserSettingsRow>(db, `SELECT username, country, shelve_after_days AS shelveAfterDays, notif_on AS notifOn,
+    notif_hour AS notifHour, timezone FROM users WHERE id = ?`, id);
+}
+
+// Champ null = inchangé.
+export function updateUserSettings(db: Db, id: number, s: {
+  country: string | null; shelveAfterDays: number | null; notifOn: number | null; notifHour: number | null;
+}): void {
+  db.prepare(`UPDATE users SET country = coalesce(?, country), shelve_after_days = coalesce(?, shelve_after_days),
+    notif_on = coalesce(?, notif_on), notif_hour = coalesce(?, notif_hour) WHERE id = ?`)
+    .run(s.country, s.shelveAfterDays, s.notifOn, s.notifHour, id);
+}
+
 // ---------- catalogue ----------
 
 export type ShowRow = {

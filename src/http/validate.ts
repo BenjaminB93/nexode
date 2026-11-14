@@ -31,6 +31,17 @@ export function oneOf<T extends string>(raw: unknown, allowed: readonly T[], fie
   return raw as T;
 }
 
+export function intOneOf<T extends number>(raw: unknown, allowed: readonly T[], field: string): T {
+  if (typeof raw !== 'number' || !(allowed as readonly number[]).includes(raw)) throw new InvalidInputError(field);
+  return raw as T;
+}
+
+// Entier dans [min, max] (corps JSON : nombre, pas chaîne).
+export function intRange(raw: unknown, min: number, max: number, field: string): number {
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < min || raw > max) throw new InvalidInputError(field);
+  return raw;
+}
+
 export function bool(raw: unknown, field: string): boolean {
   if (typeof raw !== 'boolean') throw new InvalidInputError(field);
   return raw;

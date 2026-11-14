@@ -12,10 +12,11 @@ const byName = (a: { id: number; name: string }, b: { id: number; name: string }
   a.name.localeCompare(b.name, 'fr') || a.id - b.id;
 
 // À regarder : séries suivies au statut « en cours », par date de sortie du prochain épisode (le plus ancien en haut).
-export function buildToWatch<S extends { id: number; name: string }, E extends EpisodeLike>(entries: readonly ShowEntry<S, E>[]) {
+// upNext = les épisodes sortis non vus qui suivent next : le client avance dessus après un swipe sans attendre le serveur.
+export function buildToWatch<S extends { id: number; name: string }, E extends EpisodeLike>(entries: readonly ShowEntry<S, E>[], upNextCount = 3) {
   return entries
     .filter((x) => x.follow && x.info.status === 'encours' && x.info.next)
-    .map((x) => ({ show: x.show, next: x.info.next as E, remaining: x.info.remaining }))
+    .map((x) => ({ show: x.show, next: x.info.next as E, upNext: x.info.unwatched.slice(1, 1 + upNextCount), remaining: x.info.remaining }))
     .sort((a, b) => cmp(a.next.airDate, b.next.airDate) || byName(a.show, b.show));
 }
 

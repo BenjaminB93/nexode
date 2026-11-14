@@ -25,6 +25,7 @@ export type StatusResult<E extends EpisodeLike> = {
   status: ShowStatus;
   next: E | null;                 // premier épisode sorti non vu
   remaining: number;              // épisodes sortis non vus
+  unwatched: E[];                 // épisodes sortis non vus, par saison puis numéro (next = le premier)
   future: E[];                    // épisodes non vus à date connue après aujourd'hui
   lastWatchedAt: string | null;
   lastWatchedDay: string | null;
@@ -78,6 +79,7 @@ export function computeStatus<E extends EpisodeLike>(input: StatusInput<E>): Sta
     status,
     next: unwatched[0] ?? null,
     remaining: unwatched.length,
+    unwatched,
     future,
     lastWatchedAt,
     lastWatchedDay,
