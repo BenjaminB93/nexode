@@ -3,8 +3,8 @@ import { type ImportData, type ImportWatch, type ShowRef, normTitle, showKey } f
 import { getUserShowsFor, insertUserShow, putWatched } from '../infra/repos.ts';
 import type { Catalog, SearchResult } from '../ports.ts';
 
-// Import d'un historique venu d'une autre appli (TV Time, BetaSeries), en deux temps :
-// 1. matchShows : chaque série de l'export reçoit une série TMDB proposée. Sûre (id TheTVDB, ou titre identique à une seule
+// Import d'un historique venu d'une autre appli (TV Time, BetaSeries, Refract), en deux temps :
+// 1. matchShows : chaque série de l'export reçoit une série TMDB proposée. Sûre (id TMDB ou TheTVDB, ou titre identique à une seule
 //    série qui contient presque tous les épisodes vus) ou à confirmer (homonymes, titre seulement rapproché), avec candidats.
 // 2. applyImport : avec les choix (proposés, confirmés ou corrigés par l'utilisateur), écrit l'historique et le suivi.
 // Épisodes : position (saison, numéro), repli sur l'id TheTVDB de l'épisode. Plusieurs sources pour un même épisode :
@@ -51,14 +51,15 @@ function refsOf(data: ImportData): Map<string, Ref> {
 export async function matchShows(deps: ImportDeps, userId: number, data: ImportData): Promise<Match[]> {
   const { db } = deps;
   const log = deps.log ?? (() => {});
-  // Séries « connues » : déjà dans l'historique ou les séries de l'utilisateur, ou retrouvées par id TheTVDB dans cet import.
+  // Séries « connues » : déjà dans l'historique ou les séries de l'utilisateur, ou retrouvées par identifiant dans cet import.
   const known = new Set<number>([
     ...(db.prepare('SELECT DISTINCT e.show_id AS id FROM watched w JOIN episodes e ON e.id = w.episode_id WHERE w.user_id = ?').all(userId) as { id: number }[]).map((r) => r.id),
     ...(db.prepare('SELECT show_id AS id FROM user_shows WHERE user_id = ?').all(userId) as { id: number }[]).map((r) => r.id),
   ]);
   const refs = refsOf(data);
-  // Ids TheTVDB d'abord : ils servent à départager les titres ambigus qui suivent.
-  const ordered = [...refs].sort(([, a], [, b]) => Number(b.ref.tvdbId !== null) - Number(a.ref.tvdbId !== null));
+  // Identifiants d'abord : ils servent à départager les titres ambigus qui suivent.
+  const hasId = (r: ShowRef) => Number(r.tmdbId !== null || r.tvdbId !== null);
+  const ordered = [...refs].sort(([, a], [, b]) => hasId(b.ref) - hasId(a.ref));
   const matches: Match[] = [];
   let n = 0;
   for (const [key, { ref, positions }] of ordered) {
@@ -69,7 +70,7 @@ export async function matchShows(deps: ImportDeps, userId: number, data: ImportD
       log(`série « ${label(ref)} » : ${err instanceof Error ? err.message : String(err)}`);
       m = { key, title: ref.title, year: ref.year, episodes: positions.size, kind: 'missing', choice: null, candidates: [] };
     }
-    if (m.kind === 'sure' && m.choice !== null && ref.tvdbId !== null) known.add(m.choice);
+    if (m.kind === 'sure' && m.choice !== null && hasId(ref)) known.add(m.choice);
     matches.push(m);
     if (++n % 20 === 0) log(`${n}/${refs.size} séries…`);
   }
@@ -88,6 +89,11 @@ async function matchOne(deps: ImportDeps, key: string, ref: ShowRef, positions: 
     return { id, name: s.name, year: Number(s.d?.slice(0, 4)) || null, seasonCount: s.n, posterPath: s.p, hits };
   };
 
+  if (ref.tmdbId !== null) {
+    try {
+      return { ...base, kind: 'sure', choice: ref.tmdbId, candidates: [await candidate(ref.tmdbId)] };
+    } catch { /* série retirée de TMDB : repli sur TheTVDB, puis sur le titre */ }
+  }
   if (ref.tvdbId !== null) {
     const id = await catalog.findShowByTvdb(ref.tvdbId);
     if (id !== null) return { ...base, kind: 'sure', choice: id, candidates: [await candidate(id)] };

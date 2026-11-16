@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { detectFormat, parseImportFiles } from '../src/domain/import-files.ts';
-import { normTitle, parseCsv, splitYear, wallTimeToUtc } from '../src/domain/imports.ts';
+import { crc32, deflateRawSync } from 'node:zlib';
+import { normTitle, parseCsv, showKey, splitYear, wallTimeToUtc } from '../src/domain/imports.ts';
 import { parseTvTime } from '../src/domain/tvtime.ts';
 import { parseBetaSeriesEpisodes, parseBetaSeriesSeries } from '../src/domain/betaseries.ts';
 import { applyImport, importHistory, matchShows } from '../src/usecases/import.ts';
@@ -266,4 +267,122 @@ test('homonymes à égalité d\'épisodes : la série déjà connue l\'emporte (
     const again = (await matchShows({ db, catalog }, userId, parseImportFiles([bs]).data))[0];
     assert.deepEqual([again?.kind, again?.choice, again?.candidates.map((c) => [c.id, c.hits])], ['ambiguous', 5011, [[5011, 4], [5020, 5]]], 'cas serré : à confirmer, la série connue proposée');
   }
+});
+
+// ---------- Refract ----------
+
+// Archive ZIP minimale (entrées compressées en deflate, ou stockées), comme celles de Refract.
+function zip(entries: Record<string, string>, opts: { store?: boolean; corrupt?: boolean } = {}): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(entries)) {
+    const data = Buffer.from(text, 'utf8');
+    const packed = opts.store ? data : deflateRawSync(data);
+    const nameBuf = Buffer.from(name, 'utf8');
+    const crc = (crc32(data) ^ (opts.corrupt ? 1 : 0)) >>> 0;
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0); head.writeUInt16LE(20, 4); head.writeUInt16LE(opts.store ? 0 : 8, 8);
+    head.writeUInt32LE(crc, 14); head.writeUInt32LE(packed.length, 18); head.writeUInt32LE(data.length, 22);
+    head.writeUInt16LE(nameBuf.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(opts.store ? 0 : 8, 10);
+    central.writeUInt32LE(crc, 16); central.writeUInt32LE(packed.length, 20); central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28); central.writeUInt32LE(offset, 42);
+    locals.push(head, nameBuf, packed);
+    centrals.push(central, nameBuf);
+    offset += head.length + nameBuf.length + packed.length;
+  }
+  const dir = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(centrals.length / 2, 8); end.writeUInt16LE(centrals.length / 2, 10);
+  end.writeUInt32LE(dir.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, dir, end]);
+}
+
+const rfItem = (tmdbId: number, title: string, mediaType = 'tv') =>
+  ({ mediaItemId: `m${tmdbId}`, mediaType, tmdbId, imdbId: null, tvdbId: tmdbId + 90000, title, englishTitle: title, displayTitle: title, year: 2020 });
+const rfLib = (tmdbId: number, title: string, status: string, mediaType = 'tv') =>
+  ({ item: rfItem(tmdbId, title, mediaType), status, watchedEpisodes: [], createdAt: '2024-03-01T10:00:00.000Z' });
+const rfEp = (tmdbId: number, title: string, s: number, e: number, local: string | null, extra: Record<string, unknown> = {}) =>
+  ({ item: rfItem(tmdbId, title), seasonNumber: s, episodeNumber: e, watched: true, watchedAt: local === null ? null : { local, tz: 'Europe/Paris' },
+    isSpecial: false, rewatchCount: 0, createdAt: '2026-07-14T04:39:20.623Z', ...extra });
+const rfManifest = (formatVersion = '4.5') => JSON.stringify({ formatVersion, generator: 'refract-export-v3', account: { timezone: 'Europe/Paris' } });
+const jsonLines = (rows: unknown[]) => rows.map((r) => JSON.stringify(r)).join('\n') + '\n';
+
+const REFRACT = {
+  'manifest.json': rfManifest(),
+  'README.md': '# Votre sauvegarde Refract',
+  'data/library.jsonl': jsonLines([
+    rfLib(1001, 'Série A', 'in_progress'), rfLib(1002, 'Série B', 'dropped'), rfLib(3001, 'She-Hulk : Avocate', 'planned'),
+    rfLib(4242, 'Un film', 'completed', 'movie'),
+  ]),
+  'data/episodes.jsonl': jsonLines([
+    rfEp(1001, 'Série A', 1, 1, '2023-02-05'),                                   // jour seul, hiver : midi à Paris = 11 h UTC
+    rfEp(1001, 'Série A', 1, 2, '2023-07-05'),                                   // été : 10 h UTC
+    rfEp(1001, 'Série A', 2, 1, '2026-11-01T13:46:51.127000+01:00'),             // heure exacte
+    rfEp(1001, 'Série A', 2, 2, null),                                           // sans date : date d'enregistrement
+    rfEp(1001, 'Série A', 1, 3, '2023-02-06', { isSpecial: true }),
+    rfEp(1001, 'Série A', 1, 3, '2023-02-06', { watched: false }),
+    rfEp(1002, 'Série B', 1, 1, '2022-01-10'),
+  ]),
+  'data/diary.jsonl': '{"actionType":"episode"}\n',
+};
+
+test('Refract : archive ZIP lue (deflate ou stockée), séries TMDB, statuts, dates locales à midi, films et spéciaux ignorés', () => {
+  for (const store of [false, true]) {
+    const r = parseImportFiles([{ name: 'refract-backup-4.5-2026-11-16.zip', bytes: zip(REFRACT, { store }) }]);
+    assert.deepEqual(r.files, [{ name: 'refract-backup-4.5-2026-11-16.zip', format: 'refract' }]);
+    assert.deepEqual(r.data.series.map((s) => [showKey(s.show), s.followed, s.shelved, s.addedAt]), [
+      ['tmdb:1001', true, false, '2024-03-01T10:00:00.000Z'], ['tmdb:1002', true, true, '2024-03-01T10:00:00.000Z'],
+      ['tmdb:3001', true, true, '2024-03-01T10:00:00.000Z']]);
+    assert.deepEqual(r.data.watches.map((w) => [w.show.tmdbId, w.season, w.number, w.watchedAt]), [
+      [1001, 1, 1, '2023-02-05T11:00:00.000Z'], [1001, 1, 2, '2023-07-05T10:00:00.000Z'], [1001, 2, 1, '2026-11-01T12:46:51.127Z'],
+      [1001, 2, 2, '2026-07-14T04:39:20.623Z'], [1002, 1, 1, '2022-01-10T11:00:00.000Z']]);
+  }
+});
+
+test('Refract : archive corrompue, autre version du format ou ZIP étranger refusés avec un message', () => {
+  const err = (bytes: Buffer) => parseImportFiles([{ name: 'x.zip', bytes }]).files[0]?.error;
+  assert.equal(err(zip(REFRACT, { corrupt: true })), 'manifest.json : contenu corrompu');
+  assert.equal(err(zip({ ...REFRACT, 'manifest.json': rfManifest('5.0') })), 'sauvegarde Refract au format 5.0, non prise en charge');
+  assert.equal(err(zip({ 'photo.jpg': 'xx' })), 'archive non reconnue');
+  assert.equal(err(zip(REFRACT).subarray(0, 100)), 'archive ZIP illisible');
+  assert.equal(err(zip({ ...REFRACT, 'data/episodes.jsonl': '{"item":\n' })), 'episodes.jsonl, ligne 1 : JSON invalide');
+});
+
+test('import Refract : séries sûres par id TMDB sans recherche ; série absente de TMDB → repli sur TheTVDB', async () => {
+  const { db, catalog, userId } = setup();
+  catalog.tvdbShows.set(99999 + 90000, 1002);
+  const library = REFRACT['data/library.jsonl'] + jsonLines([rfLib(99999, 'Renumérotée', 'completed')]);
+  const { data } = parseImportFiles([{ name: 'r.zip', bytes: zip({ ...REFRACT, 'data/library.jsonl': library }) }]);
+  const { matches, report: r } = await importHistory({ db, catalog }, userId, data);
+  assert.deepEqual(matches.map((m) => [m.key, m.kind, m.choice]), [
+    ['tmdb:1001', 'sure', 1001], ['tmdb:1002', 'sure', 1002], ['tmdb:3001', 'sure', 3001], ['tmdb:99999', 'sure', 1002]]);
+  assert.ok(!catalog.calls.some((c) => c.startsWith('searchShows')), 'aucune recherche par titre');
+  assert.deepEqual(r.episodes, { imported: 5, alreadySeen: 0, missing: [] });
+  assert.deepEqual(watchedRows(db, userId), [
+    [epId(1001, 1, 1), '2023-02-05T11:00:00.000Z'], [epId(1001, 1, 2), '2023-07-05T10:00:00.000Z'],
+    [epId(1001, 2, 1), '2026-11-01T12:46:51.127Z'], [epId(1001, 2, 2), '2026-07-14T04:39:20.623Z'],
+    [epId(1002, 1, 1), '2022-01-10T11:00:00.000Z']]);
+  // Série B : de côté chez Refract, suivie via la série repliée sur TheTVDB → suivie (de côté seulement si toutes les sources le disent).
+  assert.deepEqual(db.prepare('SELECT show_id AS id, state FROM user_shows WHERE user_id = ? ORDER BY show_id').all(userId).map((x: any) => [x.id, x.state]),
+    [[1001, 'followed'], [1002, 'followed'], [3001, 'shelved']]);
+});
+
+test('API d\'import : archive Refract envoyée en base64 ; base64 invalide ou texte et base64 ensemble refusés', async () => {
+  const { createApp } = await import('../src/http/app.ts');
+  const { sessionCookie } = await import('./helpers/auth.ts');
+  const { db, catalog, userId } = setup();
+  const app = createApp({ db, catalog, now: () => new Date('2026-11-14T12:00:00.000Z') });
+  const cookie = sessionCookie(db, userId, '2026-11-14T12:00:00.000Z');
+  const post = async (body: unknown) => {
+    const res = await app.request('/api/import/analyze', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    return { status: res.status, body: (await res.json()) as any };
+  };
+  const base64 = zip(REFRACT).toString('base64');
+  const ok = await post({ files: [{ name: 'refract.zip', base64 }] });
+  assert.deepEqual([ok.status, ok.body.files, ok.body.watches], [200, [{ name: 'refract.zip', format: 'refract' }], 5]);
+  assert.equal((await post({ files: [{ name: 'r.zip', base64: 'pas du base64 !' }] })).status, 400);
+  assert.equal((await post({ files: [{ name: 'r.zip', base64, text: 'x' }] })).status, 400);
 });

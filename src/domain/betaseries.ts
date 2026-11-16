@@ -17,7 +17,7 @@ export function parseBetaSeriesEpisodes(text: string): ImportData {
     if (!code || !watchedAt) continue;
     const season = Number(code[1]), number = Number(code[2]);
     if (season === 0 || number === 0) continue;
-    const show = { tvdbId: null, ...splitYear(r[C.show] ?? '') };
+    const show = { tmdbId: null, tvdbId: null, ...splitYear(r[C.show] ?? '') };
     if (!show.title) continue;
     const k = `${show.title}|${show.year}|${season}|${number}`;
     const prev = watches.get(k);
@@ -32,7 +32,7 @@ export function parseBetaSeriesSeries(text: string): ImportData {
   const C = columns(header, { title: 'title', archive: 'archive' });
   const series: ImportData['series'] = [];
   for (const r of rows) {
-    const show = { tvdbId: null, ...splitYear(r[C.title] ?? '') };
+    const show = { tmdbId: null, tvdbId: null, ...splitYear(r[C.title] ?? '') };
     if (!show.title) continue;
     series.push({ show, followed: true, shelved: int(r[C.archive]) === 1, addedAt: null });
   }

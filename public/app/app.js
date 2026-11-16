@@ -64,9 +64,11 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  * @typedef {{ name: string, pw: string, show: boolean, busy: boolean, error: string | null, bad: 'name' | 'password' | null, wait?: boolean }} Form
  * Feuille « Supprimer mon compte » ; bad : champ refusé par le serveur (seul le mot de passe peut l'être).
  * @typedef {Omit<Form, 'name'>} DelSelf
+ * Fichier d'import tel qu'envoyé à l'API : CSV en texte, archive ZIP (Refract) en base64.
+ * @typedef {{ name: string, text: string } | { name: string, base64: string }} ImportFile
  * Page d'import : fichiers lus, séries proposées (analysis), choix de l'utilisateur, recherche d'une autre série, résultat.
  * @typedef {{
- *   files: { name: string, text: string }[] | null, step: 'pick' | 'reading' | 'analyzing' | 'review' | 'importing' | 'done',
+ *   files: ImportFile[] | null, step: 'pick' | 'reading' | 'analyzing' | 'review' | 'importing' | 'done',
  *   analysis: any, choices: Record<string, number | null>, extra: Record<string, any[]>, showSure: boolean,
  *   searchFor: string | null, searchQ: string, searchResults: any[] | null, report: any, error: string | null,
  * }} ImportState
@@ -98,6 +100,17 @@ function importErrorText(e) {
   if (e && e.code === 'payload_too_large') return 'Fichiers trop volumineux';
   if (e && e.code === 'network') return 'Serveur injoignable';
   return 'Import impossible';
+}
+
+/** @param {File} f @returns {Promise<ImportFile>} */
+function readImportFile(f) {
+  if (!/.zip$/i.test(f.name)) return f.text().then((text) => ({ name: f.name, text }));
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => { const url = String(r.result); resolve({ name: f.name, base64: url.slice(url.indexOf(',') + 1) }); };
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(f);
+  });
 }
 
 /** @returns {ImportState} */
@@ -1040,7 +1053,7 @@ export class App extends Component {
   pickImportFiles(list) {
     const epoch = this.epoch;
     this.setImportState({ step: 'reading', error: null });
-    Promise.all([...list].map((f) => f.text().then((text) => ({ name: f.name, text })))).then((files) => {
+    Promise.all([...list].map(readImportFile)).then((files) => {
       if (epoch === this.epoch) this.setImportState({ files, step: 'pick' });
     }, () => { if (epoch === this.epoch) this.setImportState({ step: 'pick', error: 'Lecture des fichiers impossible' }); });
   }

@@ -31,7 +31,7 @@ export function parseTvTime(text: string): ImportData {
     const key = r[C.key] ?? '';
     const tvdbId = int(r[C.sId]);
     if (tvdbId === null) continue;
-    const show = { tvdbId, title: (r[C.name] ?? '').trim(), year: null };
+    const show = { tmdbId: null, tvdbId, title: (r[C.name] ?? '').trim(), year: null };
     if (key.startsWith('watch-episode-') || key.startsWith('rewatch-episode-')) {
       const season = int(r[C.seasonNumber]) ?? int(r[C.sNo]);
       const number = int(r[C.episodeNumber]) ?? int(r[C.epNo]);

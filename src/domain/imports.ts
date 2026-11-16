@@ -1,16 +1,17 @@
 // Imports depuis d'autres applis : format commun, détection du format, outils de lecture. Pur, sans I/O.
 
-// Série telle que l'export la désigne : id TheTVDB quand il existe (TV Time), sinon titre et éventuelle année (BetaSeries).
-export type ShowRef = { tvdbId: number | null; title: string; year: number | null };
+// Série telle que l'export la désigne : id TMDB (Refract), id TheTVDB (TV Time, Refract), sinon titre et éventuelle année (BetaSeries).
+export type ShowRef = { tmdbId: number | null; tvdbId: number | null; title: string; year: number | null };
 export type ImportWatch = { show: ShowRef; tvdbEpisodeId: number | null; season: number; number: number; watchedAt: string };
 export type ImportSeries = { show: ShowRef; followed: boolean; shelved: boolean; addedAt: string | null };
 export type ImportData = { watches: ImportWatch[]; series: ImportSeries[] };
 
-export type ImportFormat = 'tvtime' | 'betaseries-episodes' | 'betaseries-series';
+export type ImportFormat = 'tvtime' | 'betaseries-episodes' | 'betaseries-series' | 'refract';
 export const FORMAT_LABELS: Record<ImportFormat, string> = {
   tvtime: 'TV Time',
   'betaseries-episodes': 'BetaSeries (épisodes)',
   'betaseries-series': 'BetaSeries (séries)',
+  refract: 'Refract',
 };
 
 export class ImportFormatError extends Error {}
@@ -65,7 +66,7 @@ export function splitYear(title: string): { title: string; year: number | null }
 }
 
 export function showKey(ref: ShowRef): string {
-  return ref.tvdbId !== null ? `tvdb:${ref.tvdbId}` : `titre:${normTitle(ref.title)}:${ref.year ?? ''}`;
+  return ref.tmdbId !== null ? `tmdb:${ref.tmdbId}` : ref.tvdbId !== null ? `tvdb:${ref.tvdbId}` : `titre:${normTitle(ref.title)}:${ref.year ?? ''}`;
 }
 
 // Heure locale 'YYYY-MM-DD HH:MM:SS' dans un fuseau IANA → instant ISO UTC (heure d'été comprise).

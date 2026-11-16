@@ -1,5 +1,6 @@
-// Importe des exports TV Time (tracking-prod-records-v2.csv) et/ou BetaSeries (episodes-*.csv, series-*.csv) dans le compte <nom>.
-// Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier.csv>... [--essai]
+// Importe des exports TV Time (tracking-prod-records-v2.csv), BetaSeries (episodes-*.csv, series-*.csv) et/ou Refract
+// (refract-backup-*.zip) dans le compte <nom>.
+// Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier>... [--essai]
 // --essai : affiche le bilan sans rien écrire dans le compte.
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
@@ -18,7 +19,7 @@ const args = process.argv.slice(2);
 const dryRun = args.includes('--essai');
 const [username, ...paths] = args.filter((a) => a !== '--essai');
 if (!username || !paths.length) {
-  console.error('Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier.csv>... [--essai]');
+  console.error('Usage : node --env-file-if-exists=.env src/cli/import.ts <nom> <fichier>... [--essai]');
   process.exit(2);
 }
 const config = loadConfig();
@@ -34,7 +35,7 @@ if (!user) {
   process.exit(1);
 }
 
-const { data, files } = parseImportFiles(paths.map((p) => ({ name: basename(p), text: readFileSync(p, 'utf8') })));
+const { data, files } = parseImportFiles(paths.map((p) => ({ name: basename(p), bytes: readFileSync(p) })));
 for (const f of files) console.log(`${f.name} : ${f.error ? `refusé (${f.error})` : FORMAT_LABELS[f.format!]}`);
 if (files.some((f) => f.error)) process.exit(1);
 console.log(`${data.watches.length} visionnages, ${data.series.length} séries${dryRun ? ' (essai : rien ne sera écrit)' : ''}`);

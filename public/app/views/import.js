@@ -121,8 +121,8 @@ export function viewImport(app, x) {
         ${x.step === 'importing' ? 'Import en cours…' : 'Importer'}</button>`;
   } else {
     body = html`
-      ${muted('TV Time : tracking-prod-records-v2.csv · BetaSeries : episodes-….csv et series-….csv')}
-      <input id="import-files" type="file" accept=".csv,text/csv" multiple hidden onChange=${(/** @type {Event} */ ev) => {
+      ${muted('TV Time : tracking-prod-records-v2.csv · BetaSeries : episodes-….csv et series-….csv · Refract : refract-backup-….zip')}
+      <input id="import-files" type="file" accept=".csv,text/csv,.zip,application/zip" multiple hidden onChange=${(/** @type {Event} */ ev) => {
         const input = /** @type {HTMLInputElement} */ (ev.currentTarget);
         if (input.files && input.files.length) app.pickImportFiles(input.files);
         input.value = '';
@@ -130,7 +130,7 @@ export function viewImport(app, x) {
       <button type="button" class="btn btn-ghost press" style="flex: none" disabled=${busy} onClick=${() => { const el = document.getElementById('import-files'); if (el) el.click(); }}>Choisir les fichiers</button>
       ${x.files && x.files.length ? html`<section class="group" style="padding: 6px 12px">${x.files.map((f) => html`<div style="min-height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 4px">
         <span class="ell" style="flex: 1; min-width: 0; font-size: 13px">${f.name}</span>
-        <span style="flex: none; font-size: 12px; color: var(--muted)">${Math.max(1, Math.round(f.text.length / 1024))} Ko</span>
+        <span style="flex: none; font-size: 12px; color: var(--muted)">${Math.max(1, Math.round(('text' in f ? f.text.length : f.base64.length * 3 / 4) / 1024))} Ko</span>
       </div>`)}</section>` : null}
       ${x.step === 'analyzing' ? html`${muted('Analyse en cours…')}<div style="display: flex; flex-direction: column; gap: 2px">${listRowPlaceholder()}${listRowPlaceholder()}</div>` : null}
       ${x.error ? html`<span style="font-size: 13px; color: var(--danger)">${x.error}</span>` : null}

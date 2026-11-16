@@ -246,7 +246,7 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     return c.json(markSeason(ctx, showId, n));
   });
 
-  // Import d'historique (TV Time, BetaSeries) : fichiers CSV lus côté client, envoyés en texte, deux fois.
+  // Import d'historique (TV Time, BetaSeries, Refract) : fichiers envoyés deux fois, CSV en texte, archive ZIP en base64.
   // analyze : séries proposées (sûres ou à confirmer, avec candidats) ; POST /import : écriture avec les choix de l'utilisateur.
   // Un seul import à la fois (appels TMDB, mémoire du Pi).
   let importing = false;
@@ -254,9 +254,13 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     if (!Array.isArray(raw) || raw.length === 0 || raw.length > 5) throw new InvalidInputError('files');
     return parseImportFiles(raw.map((f: unknown) => {
       if (f === null || typeof f !== 'object' || Array.isArray(f)) throw new InvalidInputError('files');
-      const { name, text, ...rest } = f as Record<string, unknown>;
-      if (Object.keys(rest).length || typeof text !== 'string') throw new InvalidInputError('files');
-      return { name: str(name, 'files', 200), text };
+      const { name, text, base64, ...rest } = f as Record<string, unknown>;
+      if (Object.keys(rest).length) throw new InvalidInputError('files');
+      if (typeof text === 'string' && base64 === undefined) return { name: str(name, 'files', 200), text };
+      if (typeof base64 === 'string' && text === undefined && /^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+        return { name: str(name, 'files', 200), bytes: Buffer.from(base64, 'base64') };
+      }
+      throw new InvalidInputError('files');
     }));
   };
   const exclusive = async <T>(fn: () => Promise<T>): Promise<T> => {

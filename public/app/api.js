@@ -135,12 +135,12 @@ export const api = {
   /** @param {string} password */
   deleteMe: (password) => session(call('DELETE', '/me', { password })),
   /**
-   * Import d'historique (TV Time, BetaSeries), étape 1 : séries proposées, à confirmer.
+   * Import d'historique (TV Time, BetaSeries, Refract), étape 1 : séries proposées, à confirmer.
    * Fichier non reconnu : ApiError 'import_format' avec files.
-   * @param {{ name: string, text: string }[]} files
+   * @param {({ name: string, text: string } | { name: string, base64: string })[]} files
    */
   analyzeImport: (files) => importCall('/import/analyze', { files }),
-  /** Étape 2 : import avec les choix (clé de série → id TMDB, ou null). @param {{ name: string, text: string }[]} files @param {Record<string, number | null>} choices */
+  /** Étape 2 : import avec les choix (clé de série → id TMDB, ou null). @param {({ name: string, text: string } | { name: string, base64: string })[]} files @param {Record<string, number | null>} choices */
   importHistory: (files, choices) => importCall('/import', { files, choices }),
   /** Export RGPD : texte JSON et nom de fichier proposé par le serveur. @param {string} fallbackName */
   exportMe: async (fallbackName) => {
