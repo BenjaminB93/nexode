@@ -75,7 +75,7 @@ export function viewProfil(app, st) {
           ${role === 'admin' ? navRow('Comptes', st.users ? String(st.users.length) : null, () => app.openAdmin()) : null}
         </section>` : null}
         <section class="group">
-          ${navRow('Importer un historique', 'TV Time, BetaSeries', () => app.openImport())}
+          ${navRow('Importer un historique', null, () => app.openImport())}
           ${navRow('Exporter mes données', null, () => app.openExport())}
           <button type="button" class="row" style=${dangerRow} onClick=${() => app.logout()}>Se déconnecter</button>
           <button type="button" class="row" style=${dangerRow} onClick=${() => app.askDeleteSelf()}>Supprimer mon compte</button>

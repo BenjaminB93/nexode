@@ -1,15 +1,16 @@
 // @ts-check
-// Page « Importer un historique » (TV Time, BetaSeries) : fichiers → Analyser → séries à confirmer → Importer → résultat.
+// Page « Importer un historique » (TV Time, BetaSeries, Refract) : fichiers → Analyser → séries à confirmer → Importer → résultat.
 import { html } from '../../vendor/htm-preact-3.1.1.js';
 import { I } from '../icons.js';
 import { plural } from '../format.js';
 import { listRowPlaceholder, navHeader, poster } from '../components.js';
 
-const FORMATS = /** @type {Record<string, string>} */ ({
-  tvtime: 'TV Time',
-  'betaseries-episodes': 'BetaSeries, épisodes',
-  'betaseries-series': 'BetaSeries, séries',
-});
+// Applis prises en charge et fichiers à choisir dans leur export.
+const SOURCES = /** @type {[string, string][]} */ ([
+  ['TV Time', 'tracking-prod-records-v2.csv'],
+  ['BetaSeries', 'episodes-….csv et series-….csv'],
+  ['Refract', 'refract-backup-….zip'],
+]);
 const KIND = /** @type {Record<string, string>} */ ({ ambiguous: 'Plusieurs séries de ce titre', approximate: 'Titre approchant', missing: 'Introuvable' });
 
 /** @param {any} m */
@@ -121,7 +122,8 @@ export function viewImport(app, x) {
         ${x.step === 'importing' ? 'Import en cours…' : 'Importer'}</button>`;
   } else {
     body = html`
-      ${muted('TV Time : tracking-prod-records-v2.csv · BetaSeries : episodes-….csv et series-….csv · Refract : refract-backup-….zip')}
+      <div style="display: flex; flex-direction: column; gap: 4px">${SOURCES.map(([app, files]) => html`<div style="font-size: 13px; line-height: 1.4">
+        <span style="font-weight: 600">${app}</span><span style="color: var(--muted)"> : ${files}</span></div>`)}</div>
       <input id="import-files" type="file" accept=".csv,text/csv,.zip,application/zip" multiple hidden onChange=${(/** @type {Event} */ ev) => {
         const input = /** @type {HTMLInputElement} */ (ev.currentTarget);
         if (input.files && input.files.length) app.pickImportFiles(input.files);
