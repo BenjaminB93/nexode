@@ -2,7 +2,7 @@
 // avec l'année entre parenthèses quand BetaSeries en met une (« Once Upon a Time (2011) »).
 // episodes-<compte>.csv : id,show,episode,title,date,note — date = heure de Paris.
 // series-<compte>.csv : id,title,archive,episode,remaining,status,tags,note — archive = 1 → De côté.
-import { type ImportData, type ImportWatch, ImportFormatError, columns, int, parseCsv, splitYear, wallTimeToUtc } from './imports.ts';
+import { type ImportData, type ImportWatch, ImportFormatError, aloneInItsSecond, columns, int, parseCsv, splitYear, wallTimeToUtc } from './imports.ts';
 
 const TIMEZONE = 'Europe/Paris';
 
@@ -21,9 +21,12 @@ export function parseBetaSeriesEpisodes(text: string): ImportData {
     if (!show.title) continue;
     const k = `${show.title}|${show.year}|${season}|${number}`;
     const prev = watches.get(k);
-    if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt, single: false });   // aucune provenance dans l'export
+    if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt, single: false });
   }
-  return { watches: [...watches.values()], series: [] };
+  // Aucune provenance dans l'export : déduite de la seconde partagée.
+  const list = [...watches.values()];
+  const alone = aloneInItsSecond(list);
+  return { watches: list.map((w) => ({ ...w, single: alone(w.watchedAt) })), series: [] };
 }
 
 export function parseBetaSeriesSeries(text: string): ImportData {

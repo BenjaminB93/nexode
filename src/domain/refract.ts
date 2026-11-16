@@ -1,9 +1,10 @@
 // Sauvegarde Refract (« Vos données › Télécharger une copie » : refract-backup-<version>-<date>.zip). Pur, sans I/O.
 // Lu dans data/, la copie qui fait foi (readable/ n'en est qu'un rendu CSV) : manifest.json (version du format),
 // library.jsonl (séries et statut), episodes.jsonl (épisodes vus, date locale + fuseau). Ids TMDB partout.
-// imported = false : épisode coché dans Refract même, donc seul ; true : venu d'une autre appli, provenance inconnue.
+// imported = false : épisode coché dans Refract même, donc seul ; true : venu d'une autre appli, provenance déduite
+// de la seconde partagée (date sans heure = midi : un jour à un seul épisode compte comme seul).
 // Films, notes, journal et publications ignorés.
-import { type ImportData, type ImportSeries, type ImportWatch, ImportFormatError, wallTimeToUtc } from './imports.ts';
+import { type ImportData, type ImportSeries, type ImportWatch, ImportFormatError, aloneInItsSecond, wallTimeToUtc } from './imports.ts';
 import { readZip } from './zip.ts';
 
 export const REFRACT_FILES = ['manifest.json', 'data/library.jsonl', 'data/episodes.jsonl'] as const;
@@ -77,6 +78,7 @@ export function parseRefract(files: ReadonlyMap<string, string>): ImportData {
 
   // Un enregistrement par épisode en principe ; en cas de doublon, le plus ancien visionnage.
   const watches = new Map<string, ImportWatch>();
+  const unknown = new Set<string>();   // clés dont la provenance est à déduire
   for (const r of jsonl(episodes, 'episodes.jsonl')) {
     const show = showOf(r);
     const season = posInt(r.seasonNumber);
@@ -86,9 +88,14 @@ export function parseRefract(files: ReadonlyMap<string, string>): ImportData {
     if (!at) continue;
     const k = `${show.tmdbId}:${season}:${number}`;
     const prev = watches.get(k);
-    if (!prev || at < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt: at, single: r.imported === false });
+    if (!prev || at < prev.watchedAt) {
+      watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt: at, single: r.imported === false });
+      if (r.imported === false) unknown.delete(k);
+      else unknown.add(k);
+    }
   }
-  return { watches: [...watches.values()], series };
+  const alone = aloneInItsSecond([...watches.values()]);
+  return { watches: [...watches].map(([k, w]) => (unknown.has(k) ? { ...w, single: alone(w.watchedAt) } : w)), series };
 }
 
 export function readRefractBackup(zip: Uint8Array): ImportData {

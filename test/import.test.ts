@@ -81,6 +81,12 @@ test('BetaSeries : titre et année, code SxxEyy, spéciaux ignorés, archive →
   ]));
   assert.deepEqual(e.watches.map((w) => [w.show.title, w.show.year, w.season, w.number, w.watchedAt]), [
     ['Once Upon a Time', 2011, 2, 16, '2016-09-15T08:00:00.000Z'], ['Doctor Who', null, 26, 14, '2021-03-01T20:00:00.000Z']]);
+  assert.deepEqual(e.watches.map((w) => w.single), [true, true]);
+  // Provenance déduite : une marque qui partage sa seconde avec une autre vient d'un lot.
+  const lot = parseBetaSeriesEpisodes(bsEpisodes([
+    ['Lost', 'S01E01', '2020-05-01 21:00:00'], ['Lost', 'S01E02', '2020-05-01 21:00:00'], ['Lost', 'S01E03', '2020-05-01 21:00:01'],
+  ]));
+  assert.deepEqual(lot.watches.map((w) => [w.number, w.single]), [[1, false], [2, false], [3, true]]);
   const s = parseBetaSeriesSeries(bsSeries([['Lost', 0], ['Avenue 5', 1]]));
   assert.deepEqual(s.series.map((x) => [x.show.title, x.followed, x.shelved]), [['Lost', true, false], ['Avenue 5', true, true]]);
 });
@@ -342,6 +348,7 @@ const REFRACT = {
     rfEp(1001, 'Série A', 1, 3, '2023-02-06', { isSpecial: true }),
     rfEp(1001, 'Série A', 1, 3, '2023-02-06', { watched: false }),
     rfEp(1002, 'Série B', 1, 1, '2022-01-10'),
+    rfEp(1002, 'Série B', 1, 2, '2022-01-10'),                                   // même jour : même instant (midi), un lot
   ]),
   'data/diary.jsonl': '{"actionType":"episode"}\n',
 };
@@ -354,8 +361,8 @@ test('Refract : archive ZIP lue (deflate ou stockée), séries TMDB, statuts, da
       ['tmdb:1001', true, false, '2024-03-01T10:00:00.000Z'], ['tmdb:1002', true, true, '2024-03-01T10:00:00.000Z'],
       ['tmdb:3001', true, true, '2024-03-01T10:00:00.000Z']]);
     assert.deepEqual(r.data.watches.map((w) => [w.show.tmdbId, w.season, w.number, w.watchedAt, w.single]), [
-      [1001, 1, 1, '2023-02-05T11:00:00.000Z', false], [1001, 1, 2, '2023-07-05T10:00:00.000Z', false], [1001, 2, 1, '2026-11-01T12:46:51.127Z', true],
-      [1001, 2, 2, '2026-07-14T04:39:20.623Z', false], [1002, 1, 1, '2022-01-10T11:00:00.000Z', false]]);
+      [1001, 1, 1, '2023-02-05T11:00:00.000Z', true], [1001, 1, 2, '2023-07-05T10:00:00.000Z', true], [1001, 2, 1, '2026-11-01T12:46:51.127Z', true],
+      [1001, 2, 2, '2026-07-14T04:39:20.623Z', true], [1002, 1, 1, '2022-01-10T11:00:00.000Z', false], [1002, 1, 2, '2022-01-10T11:00:00.000Z', false]]);
   }
 });
 
@@ -377,11 +384,11 @@ test('import Refract : séries sûres par id TMDB sans recherche ; série absent
   assert.deepEqual(matches.map((m) => [m.key, m.kind, m.choice]), [
     ['tmdb:1001', 'sure', 1001], ['tmdb:1002', 'sure', 1002], ['tmdb:3001', 'sure', 3001], ['tmdb:99999', 'sure', 1002]]);
   assert.ok(!catalog.calls.some((c) => c.startsWith('searchShows')), 'aucune recherche par titre');
-  assert.deepEqual(r.episodes, { imported: 5, alreadySeen: 0, missing: [] });
+  assert.deepEqual(r.episodes, { imported: 6, alreadySeen: 0, missing: [] });
   assert.deepEqual(watchedRows(db, userId), [
     [epId(1001, 1, 1), '2023-02-05T11:00:00.000Z'], [epId(1001, 1, 2), '2023-07-05T10:00:00.000Z'],
     [epId(1001, 2, 1), '2026-11-01T12:46:51.127Z'], [epId(1001, 2, 2), '2026-07-14T04:39:20.623Z'],
-    [epId(1002, 1, 1), '2022-01-10T11:00:00.000Z']]);
+    [epId(1002, 1, 1), '2022-01-10T11:00:00.000Z'], [epId(1002, 1, 2), '2022-01-10T11:00:00.000Z']]);
   // Série B : de côté chez Refract, suivie via la série repliée sur TheTVDB → suivie (de côté seulement si toutes les sources le disent).
   assert.deepEqual(db.prepare('SELECT show_id AS id, state FROM user_shows WHERE user_id = ? ORDER BY show_id').all(userId).map((x: any) => [x.id, x.state]),
     [[1001, 'followed'], [1002, 'followed'], [3001, 'shelved']]);
@@ -399,7 +406,7 @@ test('API d\'import : archive Refract envoyée en base64 ; base64 invalide ou te
   };
   const base64 = zip(REFRACT).toString('base64');
   const ok = await post({ files: [{ name: 'refract.zip', base64 }] });
-  assert.deepEqual([ok.status, ok.body.files, ok.body.watches], [200, [{ name: 'refract.zip', format: 'refract' }], 5]);
+  assert.deepEqual([ok.status, ok.body.files, ok.body.watches], [200, [{ name: 'refract.zip', format: 'refract' }], 6]);
   assert.equal((await post({ files: [{ name: 'r.zip', base64: 'pas du base64 !' }] })).status, 400);
   assert.equal((await post({ files: [{ name: 'r.zip', base64, text: 'x' }] })).status, 400);
 });
