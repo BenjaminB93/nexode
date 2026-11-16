@@ -557,6 +557,11 @@ export class App extends Component {
       this.queue.shift();
       this.pending[op.key]--;
       op.result = res;
+      if (res && res.restored && res.restored.length) {
+        const restored = res.restored;
+        this.captureAnchor();
+        this.setState((/** @type {any} */ s) => S.applyRestored(s, restored));
+      }
       if (op.resync) this.needResync.add(op.key);
       if (op.onResult) op.onResult(res);
       if (this.pending[op.key] || !res) { this.settle(op.key); continue; }

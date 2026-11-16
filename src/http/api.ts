@@ -208,8 +208,8 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     const watchedAt = body.watchedAt === undefined ? undefined : instant(body.watchedAt, 'watchedAt', ctx.now);
     if (body.single !== undefined && watchedAt === undefined) throw new InvalidInputError('single');
     const single = body.single === undefined ? undefined : bool(body.single, 'single');
-    const { marked, shows } = markWatched(ctx, [{ episodeId, watchedAt, single }]);
-    return c.json({ marked, show: shows[0] });
+    const { marked, restored, shows } = markWatched(ctx, [{ episodeId, watchedAt, single }]);
+    return c.json({ marked, restored, show: shows[0] });
   });
 
   api.delete('/watched/:episodeId', (c) => {

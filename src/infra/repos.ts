@@ -343,6 +343,22 @@ export function markWatchedSingle(db: Db, userId: number, episodeId: number, wat
     .run(userId, episodeId, watchedAt).changes) > 0;
 }
 
+// Décochés récents (migration 006). Purge à chaque écriture de l'utilisateur : ce qui a plus de la fenêtre ne sert plus.
+export function purgeUnwatchedRecent(db: Db, userId: number, before: string): void {
+  db.prepare('DELETE FROM unwatched_recent WHERE user_id = ? AND removed_at < ?').run(userId, before);
+}
+export function putUnwatchedRecent(db: Db, userId: number, episodeId: number, watchedAt: string, single: boolean, removedAt: string): void {
+  db.prepare(`INSERT INTO unwatched_recent (user_id, episode_id, watched_at, single, removed_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (user_id, episode_id) DO UPDATE SET watched_at = excluded.watched_at, single = excluded.single, removed_at = excluded.removed_at`)
+    .run(userId, episodeId, watchedAt, single ? 1 : 0, removedAt);
+}
+// Retire et rend le décoché récent d'un épisode (null s'il n'y en a pas).
+export function takeUnwatchedRecent(db: Db, userId: number, episodeId: number): { watchedAt: string; single: boolean } | null {
+  const row = one<{ watchedAt: string; single: number }>(db,
+    'DELETE FROM unwatched_recent WHERE user_id = ? AND episode_id = ? RETURNING watched_at AS watchedAt, single', userId, episodeId);
+  return row ? { watchedAt: row.watchedAt, single: row.single === 1 } : null;
+}
+
 // Renvoie la date et la provenance supprimées, ou null si l'épisode n'était pas vu.
 export function deleteWatched(db: Db, userId: number, episodeId: number): { watchedAt: string; single: boolean } | null {
   const row = one<{ watchedAt: string; single: number }>(db,

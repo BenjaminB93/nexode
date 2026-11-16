@@ -186,21 +186,23 @@ test('Annuler une remise en non vu restaure la date d\'origine', async () => {
 });
 
 test('provenance : une action sur un seul épisode le marque seul, un lot non ; Annuler la restaure', async () => {
-  const { db, ctx } = setup();
+  const { db, ctx, catalog } = setup();
+  const later = at(db, catalog, '2026-11-13T12:10:00.000Z');   // hors de la fenêtre de recochage
+  const later2 = at(db, catalog, '2026-11-13T12:20:00.000Z');
   await setRelation(ctx, SEV.id, 'on');
   markWatched(ctx, [{ episodeId: epId(1001, 1, 1) }]);
   assert.equal(single(db, epId(1001, 1, 1)), 1);
   watchedUntil(ctx, SEV.id, epId(1001, 1, 2));             // « jusqu'ici » qui ne marque qu'un épisode : seul
   assert.equal(single(db, epId(1001, 1, 2)), 1);
   unmarkWatched(ctx, [epId(1001, 1, 1), epId(1001, 1, 2)]);
-  watchedUntil(ctx, SEV.id, epId(1001, 2, 1));             // vrai lot
+  watchedUntil(later, SEV.id, epId(1001, 2, 1));           // vrai lot
   assert.deepEqual([epId(1001, 1, 1), epId(1001, 1, 3), epId(1001, 2, 1)].map((id) => single(db, id)), [0, 0, 0]);
-  const { removed } = unmarkWatched(ctx, [epId(1001, 1, 1)]);
+  const { removed } = unmarkWatched(later, [epId(1001, 1, 1)]);
   assert.deepEqual(removed.map((r) => r.single), [false]);
-  markWatched(ctx, removed);                                // Annuler : la marque reste « en lot »
+  markWatched(later, removed);                              // Annuler : la marque reste « en lot »
   assert.equal(single(db, epId(1001, 1, 1)), 0);
-  unmarkWatched(ctx, [epId(1001, 1, 2)]);
-  assert.equal(markSeason(ctx, SEV.id, 1).marked.length, 1);   // saison où il ne manquait qu'un épisode : seul
+  unmarkWatched(later, [epId(1001, 1, 2)]);
+  assert.equal(markSeason(later2, SEV.id, 1).marked.length, 1);   // saison où il ne manquait qu'un épisode : seul
   assert.equal(single(db, epId(1001, 1, 2)), 1);
 });
 
@@ -394,4 +396,42 @@ test('réglages : valeurs par défaut, écriture partielle, seuil appliqué aux 
   assert.deepEqual(timeline(at(db, catalog, NOW)).toWatch.map((x) => x.show.id), [LONGUE.id]);
   updateSettings(ctx, { shelveAfterDays: 30 });
   assert.deepEqual(timeline(at(db, catalog, NOW)).toWatch, []);
+});
+
+test('recocher moins de 5 min après avoir décoché rend le visionnage d\'origine ; au-delà, c\'est un nouveau visionnage', async () => {
+  const { db, catalog } = setup();
+  await catalog.ensureShow(SEV.id);
+  const [a, b] = [epId(1001, 1, 1), epId(1001, 1, 2)];
+  watchedUntil(at(db, catalog, '2026-10-09T21:00:00.000Z'), SEV.id, b);         // lot : a et b, non « seuls »
+  const t0 = '2026-11-13T12:00:00.000Z';
+  unmarkWatched(at(db, catalog, t0), [a, b]);
+  // Recochage 4 min plus tard, épisode par épisode : date et provenance d'origine.
+  const r = markWatched(at(db, catalog, '2026-11-13T12:04:00.000Z'), [{ episodeId: a }]);
+  assert.deepEqual(r.restored, [{ episodeId: a, watchedAt: '2026-10-09T21:00:00.000Z', watchedDay: '2026-10-09' }]);
+  assert.equal(watchedAt(db, a), '2026-10-09T21:00:00.000Z');
+  assert.equal(single(db, a), 0);
+  // b, 6 min après : nouveau visionnage, maintenant, marqué seul.
+  const r2 = markWatched(at(db, catalog, '2026-11-13T12:06:00.000Z'), [{ episodeId: b }]);
+  assert.deepEqual(r2.restored, []);
+  assert.equal(watchedAt(db, b), '2026-11-13T12:06:00.000Z');
+  assert.equal(single(db, b), 1);
+  assert.equal((db.prepare('SELECT count(*) AS n FROM unwatched_recent').get() as { n: number }).n, 0);
+});
+
+test('décoché récent : la saison recochée revient entière ; « Annuler » consomme le décoché', async () => {
+  const { db, catalog } = setup();
+  await catalog.ensureShow(SEV.id);
+  const old = at(db, catalog, '2026-10-20T20:00:00.000Z');
+  markSeason(old, SEV.id, 1);
+  const before = [1, 2, 3].map((n) => watchedAt(db, epId(1001, 1, n)));
+  const ctx = at(db, catalog, NOW);
+  unmarkWatched(ctx, [1, 2, 3].map((n) => epId(1001, 1, n)));
+  assert.equal(markSeason(ctx, SEV.id, 1).restored.length, 3);
+  assert.deepEqual([1, 2, 3].map((n) => watchedAt(db, epId(1001, 1, n))), before);
+  // Annuler (date imposée) : le décoché est retiré, un recochage ultérieur ne le réutilise pas.
+  const { removed } = unmarkWatched(ctx, [epId(1001, 1, 1)]);
+  markWatched(ctx, removed);
+  unmarkWatched(at(db, catalog, '2026-11-13T12:10:00.000Z'), [epId(1001, 1, 1)]);
+  db.prepare('DELETE FROM unwatched_recent').run();
+  assert.deepEqual(markWatched(at(db, catalog, '2026-11-13T12:11:00.000Z'), [{ episodeId: epId(1001, 1, 1) }]).restored, []);
 });

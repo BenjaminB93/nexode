@@ -71,6 +71,43 @@ export function removeHistory(items, ids) {
   return items.filter((x) => !set.has(x.episodeId));
 }
 
+/**
+ * Visionnages rendus tels qu'avant par le serveur (recochage juste après un décochage) : date d'origine dans l'historique
+ * et dans les saisons chargées. Plus ancien que tout l'historique chargé alors qu'il reste des pages : il en sort,
+ * et reviendra à sa place en remontant.
+ * @param {any} s @param {{ episodeId: number, watchedAt: string, watchedDay: string }[]} restored
+ */
+export function applyRestored(s, restored) {
+  const by = new Map(restored.map((r) => [r.episodeId, r]));
+  /** Élément d'historique ou épisode de saison avec la date rendue (inchangé s'il n'est pas concerné). @template T @param {T} x @param {number} id */
+  const withDate = (x, id) => {
+    const r = by.get(id);
+    return r ? { ...x, watchedAt: r.watchedAt, watchedDay: r.watchedDay } : x;
+  };
+  /** @type {Record<string, any>} */
+  const patch = {};
+  if (s.hist) {
+    /** @type {HistItem[]} */
+    const moved = s.hist.items.filter((/** @type {HistItem} */ x) => by.has(x.episodeId)).map((/** @type {HistItem} */ x) => withDate(x, x.episodeId));
+    if (moved.length) {
+      const rest = removeHistory(s.hist.items, moved.map((x) => x.episodeId));
+      const oldest = rest[rest.length - 1];
+      const kept = s.hist.next && oldest ? moved.filter((x) => histOrder(x, oldest) <= 0) : moved;
+      patch.hist = { ...s.hist, items: addHistory(rest, kept) };
+    }
+  }
+  /** @type {Record<string, any>} */
+  const seasons = { ...s.seasons };
+  let changed = false;
+  for (const [k, sc] of Object.entries(s.seasons)) {
+    if (!sc.data.episodes.some((/** @type {any} */ e) => e.watchedAt && by.has(e.id))) continue;
+    changed = true;
+    seasons[k] = { ...sc, data: { ...sc.data, episodes: sc.data.episodes.map((/** @type {any} */ e) => (e.watchedAt ? withDate(e, e.id) : e)) } };
+  }
+  if (changed) patch.seasons = seasons;
+  return patch;
+}
+
 /** @param {Record<string, any>} seasons @param {number} showId */
 function seasonKeysOf(seasons, showId) {
   const prefix = showId + ':';

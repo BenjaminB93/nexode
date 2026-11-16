@@ -610,3 +610,19 @@ test('notification touchée : cible lue (adresse ou message), fiche épisode ouv
   assert.equal(app.state.picker, null);
   assert.equal(app.pendingOpen, null);
 });
+
+test('Recochage rendu tel qu’avant : l’épisode quitte le haut de l’historique pour sa date d’origine, ou en sort s’il est plus ancien que les pages chargées', () => {
+  const item = (episodeId: number, watchedAt: string) => ({ episodeId, watchedAt, watchedDay: watchedAt.slice(0, 10) });
+  const ep = { id: 1, season: 1, number: 1, aired: true, watchedAt: '2026-11-13T12:04:00.000Z', watchedDay: '2026-11-13' };
+  const base = {
+    hist: { items: [item(1, '2026-11-13T12:04:00.000Z'), item(2, '2026-11-01T20:00:00.000Z'), item(3, '2026-10-01T20:00:00.000Z')], next: 'curseur' },
+    seasons: { '7:1': { base: 0, data: { episodes: [ep] } } },
+  };
+  const within = S.applyRestored(base, [{ episodeId: 1, watchedAt: '2026-10-15T20:00:00.000Z', watchedDay: '2026-10-15' }]);
+  assert.deepEqual(within.hist.items.map((x: any) => x.episodeId), [2, 1, 3]);
+  assert.equal(within.seasons['7:1'].data.episodes[0].watchedAt, '2026-10-15T20:00:00.000Z');
+  const older = S.applyRestored(base, [{ episodeId: 1, watchedAt: '2025-01-01T20:00:00.000Z', watchedDay: '2025-01-01' }]);
+  assert.deepEqual(older.hist.items.map((x: any) => x.episodeId), [2, 3]);
+  const all = S.applyRestored({ ...base, hist: { ...base.hist, next: null } }, [{ episodeId: 1, watchedAt: '2025-01-01T20:00:00.000Z', watchedDay: '2025-01-01' }]);
+  assert.deepEqual(all.hist.items.map((x: any) => x.episodeId), [2, 3, 1]);
+});
