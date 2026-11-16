@@ -320,3 +320,21 @@ test('deux comptes : B ne voit ni ne modifie les séries et l\'historique de A',
   assert.deepEqual((await call('GET', '/api/history')).body.items.map((i: any) => i.episodeId), [e1]);
   assert.equal((await asB('GET', '/api/shows/1001')).body.seen, 1);
 });
+
+test('statistiques : séries suivies ou de côté seulement, séries référencées par nom', async () => {
+  const { call } = setup();
+  await call('PUT', '/api/shows/1001/relation', { to: 'on' });
+  await call('PUT', `/api/watched/${epId(1001, 1, 1)}`, {});
+  await call('PUT', `/api/watched/${epId(1001, 1, 2)}`, {});
+  await call('PUT', `/api/watched/${epId(1001, 1, 3)}`, {});
+  await call('PUT', `/api/watched/${epId(1002, 1, 1)}`, {});   // série non suivie : hors statistiques
+  const r = await call('GET', '/api/stats');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.episodes, 3);
+  assert.equal(r.body.started, 1);
+  assert.deepEqual([r.body.binge.show.name, r.body.binge.episodes], ['Severance', 3]);
+  assert.equal(r.body.closestEnd, null);
+  assert.equal(r.body.months.at(-1).month, '2026-11');
+  await call('PUT', '/api/shows/1001/relation', { to: 'none' });
+  assert.equal((await call('GET', '/api/stats')).body.episodes, 0);
+});

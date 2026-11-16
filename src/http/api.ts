@@ -17,6 +17,7 @@ import { setRelation } from '../usecases/relation.ts';
 import { search } from '../usecases/search.ts';
 import { SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, listCountries, updateSettings } from '../usecases/settings.ts';
 import { seasonDetail, showDetail } from '../usecases/show.ts';
+import { stats } from '../usecases/stats.ts';
 import { type MarkEntry, markSeason, markWatched, unmarkWatched, watchedUntil } from '../usecases/watched.ts';
 import { type AuthEnv, type Limits, clearSessionCookie } from './auth.ts';
 import { counting } from './rate-limit.ts';
@@ -36,6 +37,8 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
   };
 
   api.get('/me', (c) => c.json(getSettings(ctxOf(c))));
+
+  api.get('/stats', (c) => c.json(stats(ctxOf(c))));
 
   api.get('/about', (c) => {
     ctxOf(c);

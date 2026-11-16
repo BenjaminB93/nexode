@@ -350,6 +350,15 @@ export function deleteWatched(db: Db, userId: number, episodeId: number): { watc
   return row ? { watchedAt: row.watchedAt, single: row.single === 1 } : null;
 }
 
+// Statistiques : visionnages des séries suivies ou de côté, épisodes retirés exclus.
+export type StatWatchRow = { episodeId: number; showId: number; season: number; airDate: string | null; runtime: number | null; watchedAt: string; single: number };
+export function getStatWatches(db: Db, userId: number): StatWatchRow[] {
+  return all<StatWatchRow>(db, `SELECT w.episode_id AS episodeId, e.show_id AS showId, e.season, e.air_date AS airDate, e.runtime,
+      w.watched_at AS watchedAt, w.single
+    FROM watched w JOIN episodes e ON e.id = w.episode_id JOIN user_shows u ON u.user_id = w.user_id AND u.show_id = e.show_id
+    WHERE w.user_id = ? AND e.removed_at IS NULL`, userId);
+}
+
 export type HistoryRow = {
   episodeId: number; watchedAt: string; showId: number; showName: string; posterPath: string | null;
   season: number; number: number; title: string | null; titleIsVo: number; retired: number;
