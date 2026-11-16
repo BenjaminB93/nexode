@@ -6,8 +6,9 @@ import { type ShowState, loadShow, showState, showStates } from './state.ts';
 
 // Vu / non vu : idempotents, indépendants du suivi (marchent sur une série non suivie), sans effet sur la mise de côté manuelle.
 
-// watchedAt fourni = date imposée, même si l'épisode est déjà vu (sert à « Annuler » une remise en non vu).
-export type MarkEntry = { episodeId: number; watchedAt?: string };
+// watchedAt fourni = date imposée, même si l'épisode est déjà vu (sert à « Annuler » une remise en non vu) ;
+// single l'accompagne pour rendre aussi la provenance. Sans single : une action qui marque un seul épisode le marque « seul ».
+export type MarkEntry = { episodeId: number; watchedAt?: string; single?: boolean };
 
 export function markWatched(ctx: Ctx, entries: readonly MarkEntry[]): { marked: number[]; shows: ShowState[] } {
   const { marked, showIds } = applyMarks(ctx, entries);
@@ -24,24 +25,25 @@ function applyMarks(ctx: Ctx, entries: readonly MarkEntry[]): { marked: number[]
   if (notAired.length) throw new NotAiredError(notAired);
 
   // Sans date imposée : now + 1 ms par épisode dans l'ordre saison/numéro, pour que l'historique garde cet ordre.
+  const singles = new Map(entries.map((e) => [e.episodeId, e.single ?? eps.length === 1]));
   let tick = 0;
   const marked = transaction(db, () => eps.filter((e) => {
     const imposed = wanted.get(e.id);
     const at = imposed ?? new Date(ctx.now.getTime() + tick++).toISOString();
-    return putWatched(db, user.id, e.id, at, imposed !== undefined);
+    return putWatched(db, user.id, e.id, at, singles.get(e.id) as boolean, imposed !== undefined);
   }).map((e) => e.id));
   return { marked, showIds: eps.map((e) => e.showId) };
 }
 
-// Renvoie les dates supprimées (pour « Annuler »). Un épisode déjà non vu est ignoré.
-export function unmarkWatched(ctx: Ctx, episodeIds: readonly number[]): { removed: { episodeId: number; watchedAt: string }[]; shows: ShowState[] } {
+// Renvoie les dates et provenances supprimées (pour « Annuler »). Un épisode déjà non vu est ignoré.
+export function unmarkWatched(ctx: Ctx, episodeIds: readonly number[]): { removed: { episodeId: number; watchedAt: string; single: boolean }[]; shows: ShowState[] } {
   const { db, user } = ctx;
   const unique = [...new Set(episodeIds)];
   const eps = getEpisodes(db, unique);
   if (eps.length !== unique.length) throw new NotFoundError('épisode');
   const removed = transaction(db, () => eps.flatMap((e) => {
-    const at = deleteWatched(db, user.id, e.id);
-    return at === null ? [] : [{ episodeId: e.id, watchedAt: at }];
+    const r = deleteWatched(db, user.id, e.id);
+    return r === null ? [] : [{ episodeId: e.id, ...r }];
   }));
   return { removed, shows: showStates(ctx, eps.map((e) => e.showId)) };
 }

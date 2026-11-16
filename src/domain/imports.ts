@@ -2,7 +2,8 @@
 
 // Série telle que l'export la désigne : id TMDB (Refract), id TheTVDB (TV Time, Refract), sinon titre et éventuelle année (BetaSeries).
 export type ShowRef = { tmdbId: number | null; tvdbId: number | null; title: string; year: number | null };
-export type ImportWatch = { show: ShowRef; tvdbEpisodeId: number | null; season: number; number: number; watchedAt: string };
+// single : la source atteste que l'épisode a été marqué seul (son heure date un vrai visionnage), voir migration 005.
+export type ImportWatch = { show: ShowRef; tvdbEpisodeId: number | null; season: number; number: number; watchedAt: string; single: boolean };
 export type ImportSeries = { show: ShowRef; followed: boolean; shelved: boolean; addedAt: string | null };
 export type ImportData = { watches: ImportWatch[]; series: ImportSeries[] };
 

@@ -36,6 +36,8 @@ const userShow = (db: Db, showId: number) => {
 };
 const watchedAt = (db: Db, episodeId: number) =>
   (db.prepare('SELECT watched_at AS w FROM watched WHERE episode_id = ?').get(episodeId) as { w: string } | undefined)?.w;
+const single = (db: Db, episodeId: number) =>
+  (db.prepare('SELECT single AS s FROM watched WHERE episode_id = ?').get(episodeId) as { s: number } | undefined)?.s;
 
 test('suivre depuis « Non suivie » : la série arrive dans En cours', async () => {
   const { db, ctx, catalog } = setup();
@@ -162,7 +164,7 @@ test('idempotence de vu / non vu', async () => {
   const later = at(db, catalog, '2026-11-14T12:00:00.000Z');
   assert.deepEqual(markWatched(later, [{ episodeId: id }]).marked, []);
   assert.equal(watchedAt(db, id), NOW);                     // date d'origine conservée
-  assert.deepEqual(unmarkWatched(ctx, [id]).removed, [{ episodeId: id, watchedAt: NOW }]);
+  assert.deepEqual(unmarkWatched(ctx, [id]).removed, [{ episodeId: id, watchedAt: NOW, single: true }]);
   assert.deepEqual(unmarkWatched(ctx, [id]).removed, []);
   assert.throws(() => unmarkWatched(ctx, [999]), NotFoundError);
 });
@@ -175,12 +177,31 @@ test('Annuler une remise en non vu restaure la date d\'origine', async () => {
   markWatched(oct, [{ episodeId: id }]);
   const ctx = at(db, catalog, NOW);
   const { removed } = unmarkWatched(ctx, [id]);
-  assert.deepEqual(removed, [{ episodeId: id, watchedAt: '2026-10-09T21:15:00.000Z' }]);
+  assert.deepEqual(removed, [{ episodeId: id, watchedAt: '2026-10-09T21:15:00.000Z', single: true }]);
   assert.deepEqual(markWatched(ctx, removed).marked, [id]);
   assert.equal(watchedAt(db, id), '2026-10-09T21:15:00.000Z');
   // watchedAt imposé remplace aussi la date d'un épisode déjà vu.
   assert.deepEqual(markWatched(ctx, [{ episodeId: id, watchedAt: '2026-10-10T08:00:00.000Z' }]).marked, [id]);
   assert.deepEqual(markWatched(ctx, [{ episodeId: id, watchedAt: '2026-10-10T08:00:00.000Z' }]).marked, []);
+});
+
+test('provenance : une action sur un seul épisode le marque seul, un lot non ; Annuler la restaure', async () => {
+  const { db, ctx } = setup();
+  await setRelation(ctx, SEV.id, 'on');
+  markWatched(ctx, [{ episodeId: epId(1001, 1, 1) }]);
+  assert.equal(single(db, epId(1001, 1, 1)), 1);
+  watchedUntil(ctx, SEV.id, epId(1001, 1, 2));             // « jusqu'ici » qui ne marque qu'un épisode : seul
+  assert.equal(single(db, epId(1001, 1, 2)), 1);
+  unmarkWatched(ctx, [epId(1001, 1, 1), epId(1001, 1, 2)]);
+  watchedUntil(ctx, SEV.id, epId(1001, 2, 1));             // vrai lot
+  assert.deepEqual([epId(1001, 1, 1), epId(1001, 1, 3), epId(1001, 2, 1)].map((id) => single(db, id)), [0, 0, 0]);
+  const { removed } = unmarkWatched(ctx, [epId(1001, 1, 1)]);
+  assert.deepEqual(removed.map((r) => r.single), [false]);
+  markWatched(ctx, removed);                                // Annuler : la marque reste « en lot »
+  assert.equal(single(db, epId(1001, 1, 1)), 0);
+  unmarkWatched(ctx, [epId(1001, 1, 2)]);
+  assert.equal(markSeason(ctx, SEV.id, 1).marked.length, 1);   // saison où il ne manquait qu'un épisode : seul
+  assert.equal(single(db, epId(1001, 1, 2)), 1);
 });
 
 test('marquer vu ne touche pas à la mise de côté manuelle', async () => {

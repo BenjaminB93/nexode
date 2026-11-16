@@ -58,9 +58,10 @@ test('parcours complet : recherche, suivre, timeline, vu, annuler, historique', 
   assert.deepEqual((await call('PUT', `/api/watched/${e1}`, {})).body.marked, []);
 
   const del = await call('DELETE', `/api/watched/${e1}`);
-  assert.deepEqual(del.body.removed, [{ episodeId: e1, watchedAt: NOW }]);
+  assert.deepEqual(del.body.removed, [{ episodeId: e1, watchedAt: NOW, single: true }]);
   assert.equal(del.body.show.seen, 0);
-  const undo = await call('PUT', `/api/watched/${e1}`, { watchedAt: del.body.removed[0].watchedAt });
+  assert.equal((await call('PUT', `/api/watched/${e1}`, { single: true })).status, 400);   // provenance sans date imposée
+  const undo = await call('PUT', `/api/watched/${e1}`, { watchedAt: del.body.removed[0].watchedAt, single: false });
   assert.deepEqual(undo.body.marked, [e1]);
 
   const h = await call('GET', '/api/history');

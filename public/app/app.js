@@ -661,7 +661,7 @@ export class App extends Component {
   unmarkEp(showId, ep, text) {
     const e = S.epOf(ep);
     this.change({ ...this.changeBase(showId), on: false, eps: [e], count: 1 }, () => api.unmark(e.id), text,
-      (res) => (res && res.removed.length ? api.mark(e.id, res.removed[0].watchedAt) : null));
+      (res) => (res && res.removed.length ? api.mark(e.id, res.removed[0]) : null));
   }
 
   /** @param {number} showId @param {any} ep @param {boolean} watched */

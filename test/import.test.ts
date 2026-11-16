@@ -12,10 +12,10 @@ import { addUser } from './helpers/auth.ts';
 const TV_HEADER = 'runtime,ep_no,ep_id,key,s_id,user_id,s_no,created_at,gsi,updated_at,total_series_runtime,ep_watch_count,movie_watch_count,total_movies_runtime,series_follow_count,is_followed,followed_at,is_archived,most_recent_ep_watched,uuid,is_for_later,bulk_type,is_unitary,rewatch_count,is_special,movie_name,series_name,season_number,episode_number';
 const q = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
 
-function tvWatch(kind: 'watch' | 'rewatch', sId: number, epTvdb: number, s: number, e: number, at: string, name: string, special = ''): string {
+function tvWatch(kind: 'watch' | 'rewatch', sId: number, epTvdb: number, s: number, e: number, at: string, name: string, special = '', unitary = ''): string {
   const c = Array<string>(29).fill('');
   c[1] = String(e); c[2] = String(epTvdb); c[3] = `${kind}-episode-x-${sId}-${s}-${e}-${at}`; c[4] = String(sId); c[6] = String(s); c[7] = at;
-  c[24] = special; c[26] = q(name); c[27] = String(s); c[28] = String(e);
+  c[22] = unitary; c[24] = special; c[26] = q(name); c[27] = String(s); c[28] = String(e);
   return c.join(',');
 }
 function tvSeries(sId: number, name: string, o: { followed: boolean; archived?: boolean; forLater?: boolean; followedAt?: string }): string {
@@ -57,7 +57,7 @@ test('TV Time : premier visionnage gardé, spéciaux ignorés, états de suivi, 
   const d = parseTvTime([TV_HEADER,
     tvWatch('watch', 10, 501, 1, 1, '2024-02-01 20:00:00', 'Love, Death & Robots'),
     tvWatch('rewatch', 10, 501, 1, 1, '2024-01-15 21:30:00', 'Love, Death & Robots'),
-    tvWatch('watch', 10, 502, 1, 2, '2024-02-02 20:00:00', 'Love, Death & Robots'),
+    tvWatch('watch', 10, 502, 1, 2, '2024-02-02 20:00:00', 'Love, Death & Robots', '', 'true'),
     tvWatch('watch', 10, 590, 0, 1, '2024-02-03 20:00:00', 'Love, Death & Robots'),
     tvWatch('watch', 10, 591, 2, 1, '2024-02-04 20:00:00', 'Love, Death & Robots', 'true'),
     tvSeries(10, 'Love, Death & Robots', { followed: true, followedAt: '1706000000000000' }),
@@ -65,8 +65,8 @@ test('TV Time : premier visionnage gardé, spéciaux ignorés, états de suivi, 
     tvSeries(30, 'Plus tard', { followed: false, forLater: true }),
     tvSeries(40, 'Plus suivie', { followed: false }),
   ].join('\n'));
-  assert.deepEqual(d.watches.map((w) => [w.show.tvdbId, w.show.title, w.season, w.number, w.watchedAt]), [
-    [10, 'Love, Death & Robots', 1, 1, '2024-01-15T21:30:00.000Z'], [10, 'Love, Death & Robots', 1, 2, '2024-02-02T20:00:00.000Z']]);
+  assert.deepEqual(d.watches.map((w) => [w.show.tvdbId, w.show.title, w.season, w.number, w.watchedAt, w.single]), [
+    [10, 'Love, Death & Robots', 1, 1, '2024-01-15T21:30:00.000Z', false], [10, 'Love, Death & Robots', 1, 2, '2024-02-02T20:00:00.000Z', true]]);
   assert.deepEqual(d.series.map((s) => [s.show.tvdbId, s.followed, s.shelved]), [[10, true, false], [20, true, true], [30, false, true], [40, false, false]]);
   assert.equal(d.series[0]?.addedAt, new Date(1706000000000).toISOString());
   assert.equal(d.series[1]?.addedAt, '2024-01-01T10:00:00.000Z');
@@ -130,6 +130,23 @@ test('import TV Time : séries par id TheTVDB, épisodes par position puis par i
   ]);
   assert.deepEqual(db.prepare('SELECT show_id AS id, state FROM user_shows WHERE user_id = ? ORDER BY show_id').all(userId).map((x: any) => [x.id, x.state]),
     [[1001, 'followed'], [1002, 'shelved']]);
+});
+
+test("provenance : écrite à l'import, complétée par un réimport quand la date est la même, jamais à une autre date", async () => {
+  const { db, catalog, userId } = setup();
+  const singles = () => (db.prepare('SELECT episode_id AS id, single FROM watched WHERE user_id = ? ORDER BY episode_id').all(userId) as { id: number; single: number }[])
+    .map((x) => [x.id, x.single]);
+  const file = (unitary: string, at12 = '2024-01-12 20:00:00') => parseTvTime([TV_HEADER,
+    tvWatch('watch', 10, 501, 1, 1, '2024-01-10 20:00:00', 'Série A', '', unitary),
+    tvWatch('watch', 10, 502, 1, 2, '2024-01-11 20:00:00', 'Série A'),
+    tvWatch('watch', 10, 777, 3, 1, at12, 'Série A', '', unitary),
+  ].join('\n'));
+  await importHistory({ db, catalog }, userId, file('false'));
+  assert.deepEqual(singles(), [[epId(1001, 1, 1), 0], [epId(1001, 1, 2), 0], [epId(1001, 2, 1), 0]]);
+  // Réimport : même date → provenance complétée ; autre date (visionnage venu d'une autre source) → inchangée.
+  await importHistory({ db, catalog }, userId, file('true', '2024-01-13 20:00:00'));
+  assert.deepEqual(singles(), [[epId(1001, 1, 1), 1], [epId(1001, 1, 2), 0], [epId(1001, 2, 1), 0]]);
+  assert.deepEqual(watchedRows(db, userId).map(([, at]) => at), ['2024-01-10T20:00:00.000Z', '2024-01-11T20:00:00.000Z', '2024-01-12T20:00:00.000Z']);
 });
 
 test('import BetaSeries : homonymes départagés par les épisodes vus, titre rapproché signalé, année respectée', async () => {
@@ -320,7 +337,7 @@ const REFRACT = {
   'data/episodes.jsonl': jsonLines([
     rfEp(1001, 'Série A', 1, 1, '2023-02-05'),                                   // jour seul, hiver : midi à Paris = 11 h UTC
     rfEp(1001, 'Série A', 1, 2, '2023-07-05'),                                   // été : 10 h UTC
-    rfEp(1001, 'Série A', 2, 1, '2026-11-01T13:46:51.127000+01:00'),             // heure exacte
+    rfEp(1001, 'Série A', 2, 1, '2026-11-01T13:46:51.127000+01:00', { imported: false }),   // heure exacte, coché dans Refract
     rfEp(1001, 'Série A', 2, 2, null),                                           // sans date : date d'enregistrement
     rfEp(1001, 'Série A', 1, 3, '2023-02-06', { isSpecial: true }),
     rfEp(1001, 'Série A', 1, 3, '2023-02-06', { watched: false }),
@@ -336,9 +353,9 @@ test('Refract : archive ZIP lue (deflate ou stockée), séries TMDB, statuts, da
     assert.deepEqual(r.data.series.map((s) => [showKey(s.show), s.followed, s.shelved, s.addedAt]), [
       ['tmdb:1001', true, false, '2024-03-01T10:00:00.000Z'], ['tmdb:1002', true, true, '2024-03-01T10:00:00.000Z'],
       ['tmdb:3001', true, true, '2024-03-01T10:00:00.000Z']]);
-    assert.deepEqual(r.data.watches.map((w) => [w.show.tmdbId, w.season, w.number, w.watchedAt]), [
-      [1001, 1, 1, '2023-02-05T11:00:00.000Z'], [1001, 1, 2, '2023-07-05T10:00:00.000Z'], [1001, 2, 1, '2026-11-01T12:46:51.127Z'],
-      [1001, 2, 2, '2026-07-14T04:39:20.623Z'], [1002, 1, 1, '2022-01-10T11:00:00.000Z']]);
+    assert.deepEqual(r.data.watches.map((w) => [w.show.tmdbId, w.season, w.number, w.watchedAt, w.single]), [
+      [1001, 1, 1, '2023-02-05T11:00:00.000Z', false], [1001, 1, 2, '2023-07-05T10:00:00.000Z', false], [1001, 2, 1, '2026-11-01T12:46:51.127Z', true],
+      [1001, 2, 2, '2026-07-14T04:39:20.623Z', false], [1002, 1, 1, '2022-01-10T11:00:00.000Z', false]]);
   }
 });
 

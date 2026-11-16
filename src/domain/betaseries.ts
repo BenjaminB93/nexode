@@ -21,7 +21,7 @@ export function parseBetaSeriesEpisodes(text: string): ImportData {
     if (!show.title) continue;
     const k = `${show.title}|${show.year}|${season}|${number}`;
     const prev = watches.get(k);
-    if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt });
+    if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt, single: false });   // aucune provenance dans l'export
   }
   return { watches: [...watches.values()], series: [] };
 }

@@ -1,6 +1,7 @@
 // Export RGPD de TV Time (tracking-prod-records-v2.csv). Pur, sans I/O.
 // Lignes utiles : watch-episode-* et rewatch-episode-* (visionnages), user-series-* (état de suivi).
 // s_id / ep_id = identifiants TheTVDB ; created_at = instant du visionnage, en UTC.
+// is_unitary = 'true' : épisode marqué seul (sinon lot : saison, « fill-previous »…). Colonne facultative.
 import { type ImportData, type ImportWatch, ImportFormatError, columns, int, parseCsv } from './imports.ts';
 
 // '2022-11-17 19:11:15' (UTC) → ISO.
@@ -24,6 +25,7 @@ export function parseTvTime(text: string): ImportData {
     special: 'is_special', name: 'series_name', seasonNumber: 'season_number', episodeNumber: 'episode_number',
   });
 
+  const unitary = header.indexOf('is_unitary');
   // Un épisode vu plusieurs fois (revisionnage) : on garde le premier visionnage.
   const watches = new Map<string, ImportWatch>();
   const series: ImportData['series'] = [];
@@ -40,7 +42,7 @@ export function parseTvTime(text: string): ImportData {
       if (season === 0 || number === 0 || r[C.special] === 'true') continue;   // spéciaux : saison 0 absente du catalogue
       const k = `${tvdbId}:${season}:${number}`;
       const prev = watches.get(k);
-      if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: int(r[C.epId]), season, number, watchedAt });
+      if (!prev || watchedAt < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: int(r[C.epId]), season, number, watchedAt, single: r[unitary] === 'true' });
     } else if (key.startsWith('user-series-')) {
       series.push({
         show,

@@ -326,20 +326,28 @@ export function getWatchedForShows(db: Db, userId: number, showIds: readonly num
   return new Map(rows.map((r) => [r.episodeId, r.watchedAt]));
 }
 
-// overwrite = remplacer la date d'un épisode déjà vu. Renvoie true si la ligne a changé.
-export function putWatched(db: Db, userId: number, episodeId: number, watchedAt: string, overwrite: boolean): boolean {
+// single : marqué seul (voir migration 005). overwrite = remplacer date et provenance d'un épisode déjà vu.
+// Renvoie true si la ligne a changé.
+export function putWatched(db: Db, userId: number, episodeId: number, watchedAt: string, single: boolean, overwrite: boolean): boolean {
   const sql = overwrite
-    ? `INSERT INTO watched (user_id, episode_id, watched_at) VALUES (?, ?, ?)
-       ON CONFLICT (user_id, episode_id) DO UPDATE SET watched_at = excluded.watched_at WHERE watched_at <> excluded.watched_at`
-    : `INSERT INTO watched (user_id, episode_id, watched_at) VALUES (?, ?, ?) ON CONFLICT (user_id, episode_id) DO NOTHING`;
-  return Number(db.prepare(sql).run(userId, episodeId, watchedAt).changes) > 0;
+    ? `INSERT INTO watched (user_id, episode_id, watched_at, single) VALUES (?, ?, ?, ?)
+       ON CONFLICT (user_id, episode_id) DO UPDATE SET watched_at = excluded.watched_at, single = excluded.single
+       WHERE watched_at <> excluded.watched_at OR single <> excluded.single`
+    : `INSERT INTO watched (user_id, episode_id, watched_at, single) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, episode_id) DO NOTHING`;
+  return Number(db.prepare(sql).run(userId, episodeId, watchedAt, single ? 1 : 0).changes) > 0;
 }
 
-// Renvoie la date supprimée, ou null si l'épisode n'était pas vu.
-export function deleteWatched(db: Db, userId: number, episodeId: number): string | null {
-  const row = one<{ watchedAt: string }>(db, `DELETE FROM watched WHERE user_id = ? AND episode_id = ? RETURNING watched_at AS watchedAt`,
-    userId, episodeId);
-  return row?.watchedAt ?? null;
+// Import : un visionnage déjà en base à la même date, importé sans provenance, devient « marqué seul » si la source l'atteste.
+export function markWatchedSingle(db: Db, userId: number, episodeId: number, watchedAt: string): boolean {
+  return Number(db.prepare('UPDATE watched SET single = 1 WHERE user_id = ? AND episode_id = ? AND watched_at = ? AND single = 0')
+    .run(userId, episodeId, watchedAt).changes) > 0;
+}
+
+// Renvoie la date et la provenance supprimées, ou null si l'épisode n'était pas vu.
+export function deleteWatched(db: Db, userId: number, episodeId: number): { watchedAt: string; single: boolean } | null {
+  const row = one<{ watchedAt: string; single: number }>(db,
+    `DELETE FROM watched WHERE user_id = ? AND episode_id = ? RETURNING watched_at AS watchedAt, single`, userId, episodeId);
+  return row ? { watchedAt: row.watchedAt, single: row.single === 1 } : null;
 }
 
 export type HistoryRow = {

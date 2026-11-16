@@ -201,9 +201,11 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
   api.put('/watched/:episodeId', async (c) => {
     const ctx = ctxOf(c);
     const episodeId = positiveId(c.req.param('episodeId'), 'episodeId');
-    const body = await jsonBody(c, ['watchedAt']);
+    const body = await jsonBody(c, ['watchedAt', 'single']);
     const watchedAt = body.watchedAt === undefined ? undefined : instant(body.watchedAt, 'watchedAt', ctx.now);
-    const { marked, shows } = markWatched(ctx, [{ episodeId, watchedAt }]);
+    if (body.single !== undefined && watchedAt === undefined) throw new InvalidInputError('single');
+    const single = body.single === undefined ? undefined : bool(body.single, 'single');
+    const { marked, shows } = markWatched(ctx, [{ episodeId, watchedAt, single }]);
     return c.json({ marked, show: shows[0] });
   });
 
@@ -213,7 +215,7 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
     return c.json({ removed, show: shows[0] });
   });
 
-  // { on, episodeIds, watchedAt? } ou, pour annuler une remise en non vu, { on: true, restore: [{ episodeId, watchedAt }] }.
+  // { on, episodeIds, watchedAt? } ou, pour annuler une remise en non vu, { on: true, restore: [{ episodeId, watchedAt, single? }] }.
   api.post('/watched/batch', async (c) => {
     const ctx = ctxOf(c);
     const body = await jsonBody(c, ['on', 'episodeIds', 'watchedAt', 'restore']);
@@ -295,8 +297,8 @@ function restoreEntries(raw: unknown, now: Date): MarkEntry[] {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_BATCH) throw new InvalidInputError('restore');
   return raw.map((x: unknown) => {
     if (x === null || typeof x !== 'object' || Array.isArray(x)) throw new InvalidInputError('restore');
-    const { episodeId, watchedAt, ...rest } = x as Record<string, unknown>;
+    const { episodeId, watchedAt, single, ...rest } = x as Record<string, unknown>;
     if (Object.keys(rest).length) throw new InvalidInputError('restore');
-    return { episodeId: jsonId(episodeId, 'restore'), watchedAt: instant(watchedAt, 'restore', now) };
+    return { episodeId: jsonId(episodeId, 'restore'), watchedAt: instant(watchedAt, 'restore', now), single: single === undefined ? undefined : bool(single, 'restore') };
   });
 }

@@ -1,6 +1,7 @@
 // Sauvegarde Refract (« Vos données › Télécharger une copie » : refract-backup-<version>-<date>.zip). Pur, sans I/O.
 // Lu dans data/, la copie qui fait foi (readable/ n'en est qu'un rendu CSV) : manifest.json (version du format),
 // library.jsonl (séries et statut), episodes.jsonl (épisodes vus, date locale + fuseau). Ids TMDB partout.
+// imported = false : épisode coché dans Refract même, donc seul ; true : venu d'une autre appli, provenance inconnue.
 // Films, notes, journal et publications ignorés.
 import { type ImportData, type ImportSeries, type ImportWatch, ImportFormatError, wallTimeToUtc } from './imports.ts';
 import { readZip } from './zip.ts';
@@ -85,7 +86,7 @@ export function parseRefract(files: ReadonlyMap<string, string>): ImportData {
     if (!at) continue;
     const k = `${show.tmdbId}:${season}:${number}`;
     const prev = watches.get(k);
-    if (!prev || at < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt: at });
+    if (!prev || at < prev.watchedAt) watches.set(k, { show, tvdbEpisodeId: null, season, number, watchedAt: at, single: r.imported === false });
   }
   return { watches: [...watches.values()], series };
 }

@@ -1,6 +1,6 @@
 import { type Db, transaction } from '../db/index.ts';
 import { type ImportData, type ImportWatch, type ShowRef, normTitle, showKey } from '../domain/imports.ts';
-import { getUserShowsFor, insertUserShow, putWatched } from '../infra/repos.ts';
+import { getUserShowsFor, insertUserShow, markWatchedSingle, putWatched } from '../infra/repos.ts';
 import type { Catalog, SearchResult } from '../ports.ts';
 
 // Import d'un historique venu d'une autre appli (TV Time, BetaSeries, Refract), en deux temps :
@@ -8,7 +8,8 @@ import type { Catalog, SearchResult } from '../ports.ts';
 //    série qui contient presque tous les épisodes vus) ou à confirmer (homonymes, titre seulement rapproché), avec candidats.
 // 2. applyImport : avec les choix (proposés, confirmés ou corrigés par l'utilisateur), écrit l'historique et le suivi.
 // Épisodes : position (saison, numéro), repli sur l'id TheTVDB de l'épisode. Plusieurs sources pour un même épisode :
-// le plus ancien visionnage. Idempotent : un épisode déjà vu garde sa date, une série déjà dans « mes séries » son état.
+// le plus ancien visionnage. Idempotent : un épisode déjà vu garde sa date, une série déjà dans « mes séries » son état ;
+// s'il a la même date que dans l'export et que l'export l'atteste marqué seul, il le devient (provenance complétée par un réimport).
 
 export type ImportDeps = { db: Db; catalog: Catalog; log?: (message: string) => void };
 
@@ -158,7 +159,7 @@ export async function applyImport(deps: ImportDeps, userId: number, data: Import
 
   // Épisodes, au plus ancien visionnage. Ceux des séries non importées ne sont pas comptés comme manquants.
   const byPosition = db.prepare('SELECT id FROM episodes WHERE show_id = ? AND season = ? AND number = ? AND removed_at IS NULL');
-  const earliest = new Map<number, string>();
+  const earliest = new Map<number, { at: string; single: boolean }>();
   const missingKeys = new Set<string>();
   const missing = (w: ImportWatch) => {
     const k = `${showKey(w.show)}:${w.season}:${w.number}`;
@@ -175,8 +176,9 @@ export async function applyImport(deps: ImportDeps, userId: number, data: Import
       if (ep && ep.showId === showId) row = byPosition.get(showId, ep.season, ep.number) as { id: number } | undefined;
     }
     if (!row) { missing(w); continue; }
+    // À date égale (même visionnage dans deux sources), la provenance attestée l'emporte.
     const prev = earliest.get(row.id);
-    if (!prev || w.watchedAt < prev) earliest.set(row.id, w.watchedAt);
+    if (!prev || w.watchedAt < prev.at || (w.watchedAt === prev.at && w.single)) earliest.set(row.id, { at: w.watchedAt, single: w.single });
   }
 
   // Suivi : de côté seulement si toutes les sources le disent ; date d'ajout la plus ancienne connue.
@@ -190,7 +192,7 @@ export async function applyImport(deps: ImportDeps, userId: number, data: Import
   }
   const showOf = db.prepare('SELECT show_id AS id FROM episodes WHERE id = ?');
   const firstWatch = new Map<number, string>();
-  for (const [episodeId, at] of earliest) {
+  for (const [episodeId, { at }] of earliest) {
     const showId = (showOf.get(episodeId) as { id: number }).id;
     if (!firstWatch.has(showId) || at < (firstWatch.get(showId) as string)) firstWatch.set(showId, at);
   }
@@ -199,9 +201,13 @@ export async function applyImport(deps: ImportDeps, userId: number, data: Import
   const seen = new Set((db.prepare('SELECT episode_id AS id FROM watched WHERE user_id = ?').all(userId) as { id: number }[]).map((r) => r.id));
   const tracked = new Set(getUserShowsFor(db, userId, [...relations.keys()]).map((r) => r.showId));
   const write = () => {
-    for (const [episodeId, at] of earliest) {
-      if (seen.has(episodeId)) { report.episodes.alreadySeen++; continue; }
-      if (!opts.dryRun) putWatched(db, userId, episodeId, at, false);
+    for (const [episodeId, { at, single }] of earliest) {
+      if (seen.has(episodeId)) {
+        report.episodes.alreadySeen++;
+        if (single && !opts.dryRun) markWatchedSingle(db, userId, episodeId, at);
+        continue;
+      }
+      if (!opts.dryRun) putWatched(db, userId, episodeId, at, single, false);
       report.episodes.imported++;
     }
     for (const [showId, r] of relations) {

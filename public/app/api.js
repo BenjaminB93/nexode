@@ -107,11 +107,11 @@ export const api = {
   season: (id, n) => call('GET', '/shows/' + seg(id) + '/seasons/' + seg(n)),
   /** @param {number} id @param {'none' | 'on' | 'shelf'} to */
   setRelation: (id, to) => call('PUT', '/shows/' + seg(id) + '/relation', { to }),
-  /** @param {number} episodeId @param {string} [watchedAt] date imposée (annulation d'une remise en non vu) */
-  mark: (episodeId, watchedAt) => call('PUT', '/watched/' + seg(episodeId), watchedAt ? { watchedAt } : {}),
+  /** @param {number} episodeId @param {{ watchedAt: string, single: boolean }} [restore] date et provenance imposées (annulation d'une remise en non vu) */
+  mark: (episodeId, restore) => call('PUT', '/watched/' + seg(episodeId), restore ? { watchedAt: restore.watchedAt, single: restore.single } : {}),
   /** @param {number} episodeId */
   unmark: (episodeId) => call('DELETE', '/watched/' + seg(episodeId)),
-  /** @param {{ on: boolean, episodeIds?: number[], restore?: { episodeId: number, watchedAt: string }[] }} body */
+  /** @param {{ on: boolean, episodeIds?: number[], restore?: { episodeId: number, watchedAt: string, single: boolean }[] }} body */
   batch: (body) => call('POST', '/watched/batch', body),
   /** @param {number} showId @param {number} episodeId */
   watchedUntil: (showId, episodeId) => call('POST', '/shows/' + seg(showId) + '/watched-until', { episodeId }),
