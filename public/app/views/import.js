@@ -110,12 +110,22 @@ export function viewImport(app, x) {
         <span class="eyebrow">Reconnues · ${sure.length}</span>
         <span style="display: flex; color: var(--dim); transform: rotate(${x.showSure ? 90 : 0}deg); transition: transform 0.15s ease">${I.chev()}</span>
       </button>
-      ${x.showSure ? html`<section class="group" style="padding: 6px 12px">${sure.map((/** @type {any} */ m) => {
+      ${x.showSure ? html`<section class="group" style="padding: 6px 4px 6px 12px">${sure.map((/** @type {any} */ m) => {
         const c = m.candidates[0];
-        return html`<div style="min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 4px">
-          <span class="ell" style="font-size: 13px; font-weight: 600">${c ? c.name : exportLabel(m)}</span>
-          <span class="ell" style="font-size: 12px; color: var(--muted)">${[c && c.year, m.episodes ? plural(m.episodes, 'épisode', 'épisodes') : null].filter(Boolean).join(' · ')}${c && c.name !== m.title ? ' · ' + exportLabel(m) : ''}</span>
-        </div>`;
+        // Case cochée = importée ; décochée = « Ne pas importer » (série reconnue mais rattachée à tort, ou non voulue).
+        const on = (x.choices[m.key] ?? null) !== null;
+        return html`<button type="button" role="checkbox" aria-checked=${on ? 'true' : 'false'} class="press" onClick=${() => app.chooseImport(m.key, on ? null : m.choice)}
+          style="width: 100%; min-height: 48px; display: flex; align-items: center; gap: 8px; padding: 4px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span class="ell" style="font-size: 13px; font-weight: 600; color: ${on ? 'var(--fg)' : 'var(--muted)'}">${c ? c.name : exportLabel(m)}</span>
+            <span class="ell" style="font-size: 12px; color: var(--muted)">${[c && c.year, m.episodes ? plural(m.episodes, 'épisode', 'épisodes') : null].filter(Boolean).join(' · ')}${c && c.name !== m.title ? ' · ' + exportLabel(m) : ''}</span>
+          </span>
+          <span aria-hidden="true" style="flex: none; width: 44px; display: flex; justify-content: center">
+            <span style="width: 22px; height: 22px; box-sizing: border-box; border-radius: 6px; border: 2px solid ${on ? 'var(--accent-solid)' : 'var(--line-strong)'}; background: ${on ? 'var(--accent-solid)' : 'transparent'}; display: flex; align-items: center; justify-content: center">
+              ${on ? I.check('var(--on-accent)', 14, 3.5) : null}
+            </span>
+          </span>
+        </button>`;
       })}</section>` : null}
       ${x.error ? html`<span style="font-size: 13px; color: var(--danger)">${x.error}</span>` : null}
       <button type="button" class="btn btn-primary press" style="flex: none; opacity: ${busy ? 0.45 : 1}" disabled=${busy} onClick=${() => app.runImport()}>

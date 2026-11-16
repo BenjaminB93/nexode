@@ -626,3 +626,23 @@ test('Recochage rendu tel qu’avant : l’épisode quitte le haut de l’histor
   const all = S.applyRestored({ ...base, hist: { ...base.hist, next: null } }, [{ episodeId: 1, watchedAt: '2025-01-01T20:00:00.000Z', watchedDay: '2025-01-01' }]);
   assert.deepEqual(all.hist.items.map((x: any) => x.episodeId), [2, 3, 1]);
 });
+
+test('Import : une série reconnue se décoche (« Ne pas importer ») et se recoche', async () => {
+  const { viewImport } = await load('../public/app/views/import.js');
+  const app = makeApp();
+  const match = { key: 'titre:doctorwho:', title: 'Doctor Who', year: null, episodes: 692, kind: 'sure', choice: 2002,
+    candidates: [{ id: 2002, name: 'Doctor Who', year: 1963, seasonCount: 26, posterPath: null, hits: 692 }] };
+  app.state = { ...app.state, imp: { ...app.state.imp, step: 'review', showSure: true, analysis: { watches: 692, matches: [match] }, choices: { [match.key]: 2002 } } };
+  const boxes = (v: any, out: any[] = []): any[] => {
+    if (Array.isArray(v)) v.forEach((x) => boxes(x, out));
+    else if (v && typeof v === 'object') { if (v.props?.role === 'checkbox') out.push(v); boxes(v.props?.children, out); }
+    return out;
+  };
+  const box = () => boxes(viewImport(app, app.state.imp))[0];
+  assert.equal(box().props['aria-checked'], 'true');
+  box().props.onClick();
+  assert.equal(app.state.imp.choices[match.key], null);
+  assert.equal(box().props['aria-checked'], 'false');
+  box().props.onClick();
+  assert.equal(app.state.imp.choices[match.key], 2002);
+});
