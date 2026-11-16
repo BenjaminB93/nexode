@@ -75,6 +75,9 @@ export function viewProfil(app, st) {
           ${role === 'admin' ? navRow('Comptes', st.users ? String(st.users.length) : null, () => app.openAdmin()) : null}
         </section>` : null}
         <section class="group">
+          ${navRow('Mes statistiques', null, () => app.openStats())}
+        </section>
+        <section class="group">
           ${navRow('Importer un historique', null, () => app.openImport())}
           ${navRow('Exporter mes données', null, () => app.openExport())}
           <button type="button" class="row" style=${dangerRow} onClick=${() => app.logout()}>Se déconnecter</button>

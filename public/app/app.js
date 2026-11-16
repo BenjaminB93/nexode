@@ -21,6 +21,7 @@ import { viewAuth } from './views/auth.js';
 import { accountSheet, deleteSelfSheet, exportSheetView, linkSheetView, viewAdmin, viewInvites } from './views/account.js';
 import { viewImport } from './views/import.js';
 import { viewAbout } from './views/about.js';
+import { viewStats } from './views/stats.js';
 
 /** Glissement à dépasser pour valider un swipe (px). */
 export const THRESHOLD = 110;
@@ -40,7 +41,7 @@ function loadTheme() {
 }
 
 /** Vue empilée : explorateur (show = id de série) ou écran de compte ouvert depuis Profil (show = 0).
- * @typedef {{ type: 'show' | 'season' | 'episode' | 'invites' | 'admin' | 'import' | 'about', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
+ * @typedef {{ type: 'show' | 'season' | 'episode' | 'invites' | 'admin' | 'import' | 'about' | 'stats', show: number, name?: string, season?: number, number?: number, ep?: number }} View */
 
 /** @param {View} v */
 const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v.ep ?? '');
@@ -86,7 +87,7 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
  *   account: number | null, exportSheet: { data: any } | null,
  *   delSelf: DelSelf | null, imp: ImportState,
- *   push: import('./push.js').PushState | null, pushBusy: boolean, about: any,
+ *   push: import('./push.js').PushState | null, pushBusy: boolean, about: any, stats: any, statsMonth: number | null,
  * }} State
  */
 
@@ -137,7 +138,7 @@ function initialState(theme) {
     auth: null, form: emptyForm(),
     invites: null, users: null, creatingInvite: false, resetBusy: false,
     linkSheet: null, account: null, exportSheet: null, delSelf: null, imp: emptyImport(),
-    push: null, pushBusy: false, about: null,
+    push: null, pushBusy: false, about: null, stats: null, statsMonth: null,
   };
 }
 
@@ -460,6 +461,7 @@ export class App extends Component {
     if (!top) return;
     if (top.type === 'import') return;
     if (top.type === 'about') this.loadAbout();
+    else if (top.type === 'stats') this.loadStats();
     else if (top.type === 'invites') this.loadInvites();
     else if (top.type === 'admin') this.loadUsers();
     else if (top.type === 'show') this.loadShow(top.show);
@@ -1113,6 +1115,12 @@ export class App extends Component {
 
   // ---------- à propos ----------
   openAbout() { this.push({ type: 'about', show: 0 }); }
+  // Relues à chaque ouverture (l'historique change) ; les chiffres précédents restent affichés pendant le chargement.
+  openStats() { this.setState({ statsMonth: null }); this.push({ type: 'stats', show: 0 }); }
+  loadStats() {
+    return this.once('stats', () => this.read(() => api.stats(), (d) => this.setState({ stats: d }),
+      () => { if (!this.state.stats) this.setErr('stats', true); }));
+  }
   loadAbout() {
     if (this.state.about) return Promise.resolve(true);
     return this.once('about', () => this.read(() => api.about(), (d) => this.setState({ about: d }),
@@ -1309,7 +1317,7 @@ export class App extends Component {
   screenReady(st) {
     const top = st.stack[st.stack.length - 1];
     if (!top) return st.tab === 'decote' ? !!st.shelf : st.tab === 'series' ? !!st.mine : true;
-    if (top.type === 'import' || top.type === 'about') return true;
+    if (top.type === 'import' || top.type === 'about' || top.type === 'stats') return true;
     if (top.type === 'invites') return !!st.invites;
     if (top.type === 'admin') return !!st.users;
     if (top.type === 'show') return !!st.shows[top.show];
@@ -1560,6 +1568,7 @@ export class App extends Component {
     let screen;
     if (top && top.type === 'import') screen = viewImport(this, st.imp);
     else if (top && top.type === 'about') screen = viewAbout(this, st);
+    else if (top && top.type === 'stats') screen = viewStats(this, st);
     else if (top && top.type === 'invites') screen = viewInvites(this, st);
     else if (top && top.type === 'admin') screen = viewAdmin(this, st);
     else if (top && top.type === 'show') screen = viewShow(this, st, top);

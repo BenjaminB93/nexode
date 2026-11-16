@@ -151,6 +151,7 @@ export const api = {
 
   /** Version, licence et adresse du code source. */
   about: () => call('GET', '/about'),
+  stats: () => call('GET', '/stats'),
 
   // Parrainages (parrain, admin)
   invites: () => call('GET', '/invites'),
