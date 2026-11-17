@@ -321,20 +321,25 @@ test('deux comptes : B ne voit ni ne modifie les séries et l\'historique de A',
   assert.equal((await asB('GET', '/api/shows/1001')).body.seen, 1);
 });
 
-test('statistiques : séries suivies ou de côté seulement, séries référencées par nom', async () => {
+test('statistiques : séries non suivies comprises par défaut, période, années disponibles, paramètres validés', async () => {
   const { call } = setup();
   await call('PUT', '/api/shows/1001/relation', { to: 'on' });
   await call('PUT', `/api/watched/${epId(1001, 1, 1)}`, {});
   await call('PUT', `/api/watched/${epId(1001, 1, 2)}`, {});
   await call('PUT', `/api/watched/${epId(1001, 1, 3)}`, {});
-  await call('PUT', `/api/watched/${epId(1002, 1, 1)}`, {});   // série non suivie : hors statistiques
+  assert.equal((await call('GET', '/api/shows/1002')).status, 200);   // fiche consultée : série en cache, non suivie
+  assert.deepEqual((await call('PUT', `/api/watched/${epId(1002, 1, 1)}`, {})).body.marked, [epId(1002, 1, 1)]);
   const r = await call('GET', '/api/stats');
   assert.equal(r.status, 200);
-  assert.equal(r.body.episodes, 3);
-  assert.equal(r.body.started, 1);
+  assert.deepEqual([r.body.range, r.body.unfollowed, r.body.years], ['all', true, [2026]]);
+  assert.deepEqual([r.body.episodes, r.body.started], [4, 2]);
   assert.deepEqual([r.body.binge.show.name, r.body.binge.episodes], ['Severance', 3]);
-  assert.equal(r.body.closestEnd, null);
-  assert.equal(r.body.months.at(-1).month, '2026-11');
+  assert.deepEqual([r.body.histogram.unit, r.body.histogram.buckets], ['year', [{ key: '2026', episodes: 4 }]]);
+  const followed = await call('GET', '/api/stats?unfollowed=0&range=1m');
+  assert.deepEqual([followed.body.episodes, followed.body.started, followed.body.histogram.unit, followed.body.histogram.buckets.length], [3, 1, 'day', 30]);
+  assert.equal((await call('GET', '/api/stats?range=2025')).body.episodes, 0);
+  assert.equal((await call('GET', '/api/stats?range=2ans')).status, 400);
+  assert.equal((await call('GET', '/api/stats?unfollowed=oui')).status, 400);
   await call('PUT', '/api/shows/1001/relation', { to: 'none' });
-  assert.equal((await call('GET', '/api/stats')).body.episodes, 0);
+  assert.equal((await call('GET', '/api/stats?unfollowed=0')).body.episodes, 0);
 });

@@ -18,6 +18,7 @@ import { search } from '../usecases/search.ts';
 import { SHELVE_AFTER_DAYS, type SettingsPatch, getSettings, listCountries, updateSettings } from '../usecases/settings.ts';
 import { seasonDetail, showDetail } from '../usecases/show.ts';
 import { stats } from '../usecases/stats.ts';
+import { isRange } from '../domain/stats.ts';
 import { type MarkEntry, markSeason, markWatched, unmarkWatched, watchedUntil } from '../usecases/watched.ts';
 import { type AuthEnv, type Limits, clearSessionCookie } from './auth.ts';
 import { counting } from './rate-limit.ts';
@@ -38,7 +39,13 @@ export function createApi(deps: ApiDeps): Hono<AuthEnv> {
 
   api.get('/me', (c) => c.json(getSettings(ctxOf(c))));
 
-  api.get('/stats', (c) => c.json(stats(ctxOf(c))));
+  // ?range=all|1y|6m|3m|1m|AAAA (défaut all) & unfollowed=1|0 (défaut 1 : séries qu'on ne suit plus comprises).
+  api.get('/stats', (c) => {
+    const range = c.req.query('range') ?? 'all';
+    if (!isRange(range)) throw new InvalidInputError('range');
+    const unfollowed = oneOf(c.req.query('unfollowed') ?? '1', ['0', '1'] as const, 'unfollowed') === '1';
+    return c.json(stats(ctxOf(c), { range, unfollowed }));
+  });
 
   api.get('/about', (c) => {
     ctxOf(c);

@@ -151,7 +151,8 @@ export const api = {
 
   /** Version, licence et adresse du code source. */
   about: () => call('GET', '/about'),
-  stats: () => call('GET', '/stats'),
+  /** @param {string} range all, 1y, 6m, 3m, 1m ou une année @param {boolean} unfollowed séries non suivies comprises */
+  stats: (range, unfollowed) => call('GET', '/stats?range=' + encodeURIComponent(range) + '&unfollowed=' + (unfollowed ? '1' : '0')),
 
   // Parrainages (parrain, admin)
   invites: () => call('GET', '/invites'),

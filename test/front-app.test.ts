@@ -646,3 +646,17 @@ test('Import : une série reconnue se décoche (« Ne pas importer ») et se rec
   box().props.onClick();
   assert.equal(app.state.imp.choices[match.key], 2002);
 });
+
+test('Statistiques : un changement de filtre relit avec les nouveaux paramètres ; une réponse pour d’anciens filtres est ignorée', async (t: TestContext) => {
+  const app = makeApp();
+  const pending: { args: any[]; resolve: (d: any) => void }[] = [];
+  const stats = t.mock.method(api, 'stats', (...args: any[]) => new Promise((resolve) => pending.push({ args, resolve })));
+  app.loadStats();
+  app.setStatsFilter({ statsRange: '2024' });
+  app.setStatsFilter({ statsUnfollowed: false });
+  assert.deepEqual(stats.mock.calls.map((c: any) => c.arguments), [['all', true], ['2024', true], ['2024', false]]);
+  pending[2]!.resolve({ range: '2024', unfollowed: false });
+  pending[0]!.resolve({ range: 'all', unfollowed: true });   // arrivée en retard : ignorée
+  await wait(5);
+  assert.deepEqual([app.state.stats, app.state.statsRange, app.state.statsUnfollowed], [{ range: '2024', unfollowed: false }, '2024', false]);
+});

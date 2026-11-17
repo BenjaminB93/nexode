@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { type StatShow, type StatWatch, computeStats, nightOf } from '../src/domain/stats.ts';
+import { type StatShow, type StatWatch, computeStats, nightOf, periodOf } from '../src/domain/stats.ts';
 
 const TZ = 'Europe/Paris';
-const OPTS = { timezone: TZ, today: '2026-11-16' };
+const TODAY = '2026-11-16';
+const OPTS = { timezone: TZ, period: periodOf('all', TODAY, '2016-01-01') };
+const during = (range: string) => ({ timezone: TZ, period: periodOf(range, TODAY, '2016-01-01') });
 
 let nextId = 1;
 const w = (showId: number, season: number, watchedAt: string, o: Partial<StatWatch> = {}): StatWatch =>
@@ -80,16 +82,36 @@ test('dès la sortie : le jour même ou le lendemain, marques seules ; null sans
   assert.equal(computeStats([w(1, 1, '2026-10-01T20:00:00Z', { single: false })], [show(1)], OPTS).sameDay, null);
 });
 
-test('mois : les 12 derniers, marques seules, en heure locale', () => {
-  const r = computeStats([
-    w(1, 1, '2026-10-31T23:30:00Z'),                    // 1er novembre à Paris
-    w(1, 1, '2025-12-15T20:00:00Z'),
-    w(1, 1, '2025-11-15T20:00:00Z'),                    // hors fenêtre
-    w(1, 1, '2026-11-02T20:00:00Z', { single: false }),
-  ], [show(1)], OPTS);
-  assert.equal(r.months.length, 12);
-  assert.deepEqual(r.months[0], { month: '2025-12', episodes: 1 });
-  assert.deepEqual(r.months[11], { month: '2026-11', episodes: 1 });
+test('périodes : tout par année, une année ou 1 an / 6 mois par mois, 3 mois par semaine, 1 mois par jour', () => {
+  assert.deepEqual(periodOf('all', TODAY, '2016-05-02'), { from: null, to: TODAY, unit: 'year', keys: ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'] });
+  assert.deepEqual(periodOf('all', TODAY, null).keys, ['2026']);
+  const y = periodOf('2024', TODAY, null);
+  assert.deepEqual([y.from, y.to, y.unit, y.keys.length, y.keys[0], y.keys[11]], ['2024-01-01', '2024-12-31', 'month', 12, '2024-01', '2024-12']);
+  const a = periodOf('1y', TODAY, null);
+  assert.deepEqual([a.from, a.keys.length, a.keys[0], a.keys[11]], ['2025-12-01', 12, '2025-12', '2026-11']);
+  assert.deepEqual(periodOf('6m', TODAY, null).keys, ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+  const w = periodOf('3m', TODAY, null);                   // 16/11/2026 est un lundi
+  assert.deepEqual([w.unit, w.keys.length, w.keys[0], w.keys[12], w.from], ['week', 13, '2026-08-24', '2026-11-16', '2026-08-24']);
+  const d = periodOf('1m', TODAY, null);
+  assert.deepEqual([d.unit, d.keys.length, d.keys[0], d.keys[29]], ['day', 30, '2026-10-18', TODAY]);
+});
+
+test('période : visionnages filtrés par jour local, histogramme des marques seules, séries commencées / terminées dans la période', () => {
+  const ws = [
+    w(1, 1, '2024-12-31T23:30:00Z'),                    // 1er janvier 2025 à Paris
+    w(1, 1, '2024-06-15T20:00:00Z', { single: false }),
+    w(2, 1, '2024-03-01T20:00:00Z'),
+    w(2, 1, '2025-02-01T20:00:00Z'),
+  ];
+  const shows = [show(1, { status: 'terminee' }), show(2, { status: 'terminee' })];
+  const y24 = computeStats(ws, shows, during('2024'));
+  assert.equal(y24.episodes, 2);
+  assert.deepEqual(y24.histogram.buckets.filter((b) => b.episodes).map((b) => [b.key, b.episodes]), [['2024-03', 1]]);   // le lot ne compte pas
+  assert.deepEqual([y24.started, y24.finished], [2, 0]);   // série 1 commencée en juin 2024, finie en 2025
+  const y25 = computeStats(ws, shows, during('2025'));
+  assert.deepEqual([y25.episodes, y25.started, y25.finished], [2, 0, 2]);
+  const all = computeStats(ws, shows, OPTS);
+  assert.deepEqual(all.histogram.buckets.filter((b) => b.episodes).map((b) => [b.key, b.episodes]), [['2024', 1], ['2025', 2]]);
 });
 
 test('fidélité : série en cours dont le premier visionnage marqué seul est le plus ancien', () => {

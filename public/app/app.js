@@ -87,7 +87,8 @@ const viewKey = (v) => v.type + ':' + v.show + ':' + (v.season ?? '') + ':' + (v
  *   linkSheet: { title: string, sub: string, url: string | null, inviteId?: number, copied?: 'ok' | 'fail' | null } | null,
  *   account: number | null, exportSheet: { data: any } | null,
  *   delSelf: DelSelf | null, imp: ImportState,
- *   push: import('./push.js').PushState | null, pushBusy: boolean, about: any, stats: any, statsMonth: number | null,
+ *   push: import('./push.js').PushState | null, pushBusy: boolean, about: any,
+ *   stats: any, statsBar: number | null, statsRange: string, statsUnfollowed: boolean,
  * }} State
  */
 
@@ -138,7 +139,7 @@ function initialState(theme) {
     auth: null, form: emptyForm(),
     invites: null, users: null, creatingInvite: false, resetBusy: false,
     linkSheet: null, account: null, exportSheet: null, delSelf: null, imp: emptyImport(),
-    push: null, pushBusy: false, about: null, stats: null, statsMonth: null,
+    push: null, pushBusy: false, about: null, stats: null, statsBar: null, statsRange: 'all', statsUnfollowed: true,
   };
 }
 
@@ -1120,11 +1121,20 @@ export class App extends Component {
 
   // ---------- à propos ----------
   openAbout() { this.push({ type: 'about', show: 0 }); }
-  // Relues à chaque ouverture (l'historique change) ; les chiffres précédents restent affichés pendant le chargement.
-  openStats() { this.setState({ statsMonth: null }); this.push({ type: 'stats', show: 0 }); }
-  loadStats() {
-    return this.once('stats', () => this.read(() => api.stats(), (d) => this.setState({ stats: d }),
-      () => { if (!this.state.stats) this.setErr('stats', true); }));
+  // Relues à chaque ouverture (l'historique change) et à chaque changement de filtre ; les chiffres précédents restent
+  // affichés pendant le chargement. Une réponse qui ne correspond plus aux filtres affichés est ignorée.
+  openStats() { this.setState({ statsBar: null }); this.push({ type: 'stats', show: 0 }); }
+  loadStats(range = this.state.statsRange, unfollowed = this.state.statsUnfollowed) {
+    return this.once('stats:' + range + ':' + unfollowed, () => this.read(() => api.stats(range, unfollowed), (d) => {
+      if (this.state.statsRange === range && this.state.statsUnfollowed === unfollowed) this.setState({ stats: d });
+    }, () => { if (!this.state.stats) this.setErr('stats', true); }));
+  }
+  /** @param {{ statsRange?: string, statsUnfollowed?: boolean }} patch */
+  setStatsFilter(patch) {
+    const range = patch.statsRange ?? this.state.statsRange;
+    const unfollowed = patch.statsUnfollowed ?? this.state.statsUnfollowed;
+    this.setState({ statsRange: range, statsUnfollowed: unfollowed, statsBar: null });
+    this.loadStats(range, unfollowed);
   }
   loadAbout() {
     if (this.state.about) return Promise.resolve(true);
