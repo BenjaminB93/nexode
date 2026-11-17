@@ -1,7 +1,7 @@
 // @ts-check
 // Explorateur, saison : épisodes avec coche (= swipe, dans les deux sens), coche de toute la saison.
 import { html } from '../../vendor/htm-preact-3.1.1.js';
-import { code, epTitle, fDay, fShort, plural } from '../format.js';
+import { code, epTitle, fDay, fShort, fTime, plural } from '../format.js';
 import { dot, dotView, loadError, navHeader, phLine } from '../components.js';
 
 /** @param {import('../app.js').App} app @param {any} st @param {import('../app.js').View} top */
@@ -42,7 +42,7 @@ export function viewSeason(app, st, top) {
           ${eps.map((/** @type {any} */ ep) => {
             const w = !!ep.watchedAt;
             const sub = !ep.airDate ? 'date inconnue'
-              : ep.aired ? (w ? 'vu le ' + fShort(ep.watchedDay, today) : ep.airDate === today ? 'sorti aujourd’hui' : 'sorti le ' + fShort(ep.airDate, today))
+              : ep.aired ? (w ? 'vu le ' + fShort(ep.watchedDay, today) + ' à ' + fTime(ep.watchedAt, app.tz()) : ep.airDate === today ? 'sorti aujourd’hui' : 'sorti le ' + fShort(ep.airDate, today))
               : 'à venir · ' + fDay(ep.airDate, today);
             const sw = app.swipe('e:' + ep.id, ep.aired, () => app.toggleEp(id, ep, w));
             const label = w ? 'Non vu' : 'Vu';

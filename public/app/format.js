@@ -76,6 +76,22 @@ export function localDay(instant, timezone) {
   return part('year') + '-' + part('month') + '-' + part('day');
 }
 
+/** @type {Map<string, Intl.DateTimeFormat>} */
+const timeFormats = new Map();
+/** Heure locale « 19 h 30 » d'un instant ISO dans un fuseau IANA. @param {string} instant @param {string} timezone */
+export function fTime(instant, timezone) {
+  let f = timeFormats.get(timezone);
+  if (!f) {
+    try { f = new Intl.DateTimeFormat('fr-FR', { timeZone: timezone, hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }); }
+    catch { f = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }); }
+    timeFormats.set(timezone, f);
+  }
+  const parts = f.formatToParts(new Date(instant));
+  /** @param {string} t */
+  const part = (t) => parts.find((p) => p.type === t)?.value ?? '';
+  return Number(part('hour')) + ' h ' + part('minute');
+}
+
 /** @param {string | null | undefined} p */
 export const posterUrl = (p) => (p ? 'https://image.tmdb.org/t/p/w185' + p : null);
 /** @param {string | null | undefined} p */

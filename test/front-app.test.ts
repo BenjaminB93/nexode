@@ -260,6 +260,12 @@ test('Export : nom de fichier tiré de Content-Disposition ; dates du serveur ra
   assert.equal(F.dayOf('2026-11-14T23:30:00.000Z', 'America/New_York'), '2026-11-14');
 });
 
+test('Heure de visionnage : fuseau de l’utilisateur, « 19 h 30 »', () => {
+  assert.equal(F.fTime('2026-11-15T18:30:00.000Z', 'Europe/Paris'), '19 h 30');
+  assert.equal(F.fTime('2026-11-15T23:05:00.000Z', 'Europe/Paris'), '0 h 05');
+  assert.equal(F.fTime('2026-07-15T11:00:00.000Z', 'Europe/Paris'), '13 h 00');   // heure d'été
+});
+
 test('API : un 401 d’une route protégée signale la fin de session, pas une réponse partie avant la connexion', async (t: TestContext) => {
   let n = 0;
   onUnauthorized(() => { n++; });

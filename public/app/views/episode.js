@@ -1,7 +1,7 @@
 // @ts-check
 // Explorateur, fiche épisode : vu / non vu, « Tout marquer vu jusqu'ici », épisode précédent / suivant (sans empiler).
 import { html } from '../../vendor/htm-preact-3.1.1.js';
-import { code, epTitle, fDay, tmdbUrl, tmdbWatchUrl } from '../format.js';
+import { code, epTitle, fDay, fTime, tmdbUrl, tmdbWatchUrl } from '../format.js';
 import { extLink, loadError, navHeader, phLine, providersRow } from '../components.js';
 import { untilCounts } from '../store.js';
 
@@ -64,7 +64,7 @@ export function viewEpisode(app, st, top) {
         <h1 class="h1" style="font-size: 26px; line-height: 1.15; color: ${ep.title ? 'var(--fg)' : 'var(--muted)'}">${epTitle(ep)}${ep.titleIsVo ? ' (VO)' : ''}</h1>
         <span style="font-size: 13px; color: var(--muted)">${meta}</span>
         ${prov.length ? html`<div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px">${providersRow(prov)}${extLink(tmdbWatchUrl(id, st.me && st.me.country), 'JustWatch')}</div>` : null}
-        <span style="font-size: 13px; font-weight: 600; color: ${w ? 'var(--ok)' : 'var(--muted)'}">${w ? 'Vu le ' + fDay(ep.watchedDay, today) : ep.aired ? 'Pas encore vu' : 'Pas encore diffusé'}</span>
+        <span style="font-size: 13px; font-weight: 600; color: ${w ? 'var(--ok)' : 'var(--muted)'}">${w ? 'Vu le ' + fDay(ep.watchedDay, today) + ' à ' + fTime(ep.watchedAt, app.tz()) :ep.aired ? 'Pas encore vu' : 'Pas encore diffusé'}</span>
         <p style="margin: 0; font-size: 14px; line-height: 1.6; color: var(--soft)">${ep.overview || 'Pas de résumé disponible pour cet épisode.'}</p>
         ${ep.aired ? html`<div style="display: flex; flex-direction: column; gap: 10px; margin-top: 6px">
           <button type="button" class=${'btn ' + (w ? 'btn-ghost' : 'btn-primary')} onClick=${() => app.toggleEp(id, ep, w)}>${w ? 'Marquer comme non vu' : 'Marquer comme vu'}</button>
